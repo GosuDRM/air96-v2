@@ -448,7 +448,6 @@ static void side_breathe_mode_show(void)
  */
 static void side_static_mode_show(void)
 {
-    uint8_t play_index;
 
     if (side_play_cnt <= side_speed_table[side_mode][side_speed])
         return;
