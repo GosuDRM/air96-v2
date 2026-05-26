@@ -1,0 +1,46 @@
+name: Lint Air96 V2
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install cppcheck
+      run: sudo apt-get update -qq && sudo apt-get install -y cppcheck
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=warning,style,performance,portability \
+          --suppress=missingInclude --suppress=unusedFunction \
+          --suppress=normalCheckLevelMaxBranches \
+          --suppress=unmatchedSuppression \
+          keyboards/air96_v2/ansi/*.c keyboards/air96_v2/ansi/*.h
+
+  clang-tidy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install deps
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y gcc-arm-none-eabi clang-tidy
+        python3 -m pip install -r requirements.txt
+        python3 -m pip install qmk
+    - name: Generate compile database
+      run: qmk generate-compilation-database -kb air96_v2/ansi -km default
+    - name: Run clang-tidy (advisory)
+      run: |
+        clang-tidy -p compile_commands.json \
+          --checks='-*,bugprone-*,readability-braces-around-statements,readability-redundant-declaration,readability-implicit-bool-conversion,misc-use-internal-linkage' \
+          --header-filter='keyboards/air96_v2/ansi/.*' \
+          keyboards/air96_v2/ansi/ansi.c \
+          keyboards/air96_v2/ansi/rf.c \
+          keyboards/air96_v2/ansi/side.c \
+          keyboards/air96_v2/ansi/sleep.c \
+          2>&1 | head -200 || true

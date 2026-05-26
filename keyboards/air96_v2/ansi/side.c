@@ -204,7 +204,7 @@ void side_mode_control(uint8_t dir)
  * @brief  set left side leds.
  * @param  ...
  */
-void set_left_rgb(uint8_t r, uint8_t g, uint8_t b)
+static void set_left_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
     for (int i = 0; i < SIDE_LINE; i++)
         rgb_matrix_set_color(SIDE_INDEX + i, r, g, b);
@@ -214,7 +214,7 @@ void set_left_rgb(uint8_t r, uint8_t g, uint8_t b)
  * @brief  set right side leds.
  * @param  ...
  */
-void set_right_rgb(uint8_t r, uint8_t g, uint8_t b)
+static void set_right_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
     for (int i = 0; i < SIDE_LINE; i++)
         rgb_matrix_set_color(SIDE_INDEX + SIDE_LINE + i, r, g, b);
@@ -223,7 +223,7 @@ void set_right_rgb(uint8_t r, uint8_t g, uint8_t b)
 /**
  * @brief   system switch led show
  */
-void sys_sw_led_show(void)
+static void sys_sw_led_show(void)
 {
     static uint32_t sys_show_timer = 0;
     static bool sys_show_flag      = false;
@@ -259,7 +259,7 @@ void sys_sw_led_show(void)
 /**
  * @brief  sleep enable or disable indicate
  */
-void sleep_sw_led_show(void)
+static void sleep_sw_led_show(void)
 {
     static uint32_t sleep_show_timer = 0;
     static bool sleep_show_flag      = false;
@@ -295,7 +295,7 @@ void sleep_sw_led_show(void)
 /**
  * @brief  host system led indicate.
  */
-void sys_led_show(void)
+static void sys_led_show(void)
 {
     if (dev_info.link_mode == LINK_USB) {
         if (host_keyboard_led_state().caps_lock) {
@@ -499,7 +499,7 @@ static void side_off_mode_show(void)
  * @brief  rf state indicate
  */
 
-void rf_led_show(void)
+static void rf_led_show(void)
 {
     static uint32_t rf_blink_timer = 0;
     uint16_t rf_blink_priod        = 0;
@@ -550,7 +550,7 @@ void rf_led_show(void)
 /**
  * @brief  bat_num_led.
  */
-void bat_num_led(uint8_t bat_percent)
+static void bat_num_led(uint8_t bat_percent)
 {
     uint8_t r, g, b;
 
@@ -602,7 +602,7 @@ void bat_led_close(void)
 uint8_t bat_end_led        = 0;
 uint8_t bat_r, bat_g, bat_b;
 
-void bat_percent_led(uint8_t bat_percent)
+static void bat_percent_led(uint8_t bat_percent)
 {
     if (bat_percent <= 20) {
         bat_end_led = 0;
@@ -635,7 +635,7 @@ void bat_percent_led(uint8_t bat_percent)
 /**
  * @brief  battery state indicate
  */
-void bat_led_show(void)
+static void bat_led_show(void)
 {
     static uint8_t play_point      = 0;
     static uint32_t bat_play_timer = 0;

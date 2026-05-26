@@ -73,7 +73,7 @@ void uart_send_report_func(void);
 void uart_receive_pro(void);
 void Sleep_Handle(void);
 uint8_t uart_send_cmd(uint8_t cmd, uint8_t ack_cnt, uint8_t delayms);
-void uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_size);
+void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t report_size);
 
 void device_reset_show(void);
 void device_reset_init(void);
@@ -103,7 +103,7 @@ extern void num_led_show(void);
 /**
  * @brief  gpio initial.
  */
-void m_gpio_init(void)
+static void m_gpio_init(void)
 {
     setPinOutput(DC_BOOST_PIN); writePinHigh(DC_BOOST_PIN);
 
@@ -126,7 +126,7 @@ void m_gpio_init(void)
 /**
  * @brief  long press key process.
  */
-void long_press_key(void)
+static void long_press_key(void)
 {
     static uint32_t long_press_timer = 0;
 
@@ -268,7 +268,7 @@ static void switch_dev_link(uint8_t mode)
 /**
  * @brief  scan dial switch.
  */
-void dial_sw_scan(void)
+static void dial_sw_scan(void)
 {
     uint8_t dial_scan               = 0;
     static uint8_t dial_save        = 0xf0;
@@ -343,7 +343,7 @@ void dial_sw_scan(void)
 /**
  * @brief  power on scan dial switch.
  */
-void m_power_on_dial_sw_scan(void)
+static void m_power_on_dial_sw_scan(void)
 {
     uint8_t dial_scan_dev = 0;
     uint8_t dial_scan_sys = 0;
@@ -610,7 +610,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 /**
  *   @brief  timer process.
  */
-void timer_pro(void)
+static void timer_pro(void)
 {
     static uint32_t interval_timer = 0;
     static bool f_first            = true;
@@ -641,7 +641,7 @@ void timer_pro(void)
 /**
  * @brief  londing eeprom data.
  */
-void m_londing_eeprom_data(void)
+static void m_londing_eeprom_data(void)
 {
     eeconfig_read_user_datablock(&user_config);
     if (user_config.default_brightness_flag != 0xA5) {

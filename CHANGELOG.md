@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.0.4 — GosuDRM (2026-05-26)
+
+Code quality: cppcheck and clang-tidy lint pass. Applied static linkage, const-correctness, and redundant-branch fixes across all Air96 source files.
+
+### Fixed
+
+- **rf.c:500** — Redundant `else if (dev_info.rf_state == RF_CONNECT)` after `if (dev_info.rf_state != RF_CONNECT)` changed to plain `else`
+- **rf.c** — `UART_Send_Bytes`, `get_checksum`, `RF_Protocol_Receive` made static; `uart_auto_nkey_send` params const
+- **ansi.c** — `m_gpio_init`, `long_press_key`, `dial_sw_scan`, `m_power_on_dial_sw_scan`, `timer_pro`, `m_londing_eeprom_data` made static
+- **side.c** — 9 internal functions made static (`set_left_rgb`, `set_right_rgb`, `sys_sw_led_show`, `sleep_sw_led_show`, `sys_led_show`, `rf_led_show`, `bat_num_led`, `bat_percent_led`, `bat_led_show`)
+
+### Added
+
+- **lint.yml** — CI workflow: cppcheck (blocking) + clang-tidy (advisory) on Air96 source files only
+
 ## v3.0.3 — GosuDRM (2026-05-26)
 
 Latency optimization: eliminated ~2ms blocking in main loop, reordered housekeeping.

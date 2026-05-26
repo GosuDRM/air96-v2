@@ -41,9 +41,9 @@ extern bool            f_dial_sw_init_ok;
 
 report_mouse_t mousekey_get_report(void);
 void           uart_init(uint32_t baud); // qmk uart.c
-void           uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_size);
-void           UART_Send_Bytes(uint8_t *Buffer, uint32_t Length);
-uint8_t        get_checksum(uint8_t *buf, uint8_t len);
+void    uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t report_size);
+static void    UART_Send_Bytes(const uint8_t *Buffer, uint32_t Length);
+static uint8_t get_checksum(const uint8_t *buf, uint8_t len);
 void           uart_receive_pro(void);
 void           m_break_all_key(void);
 uint16_t       host_last_consumer_usage(void);
@@ -52,7 +52,7 @@ uint16_t       host_last_consumer_usage(void);
  * @brief Uart auto nkey send
  */
 bool f_bit_kb_act = 0;
-static void uart_auto_nkey_send(uint8_t *pre_bit_report, uint8_t *now_bit_report, uint8_t size)
+static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *now_bit_report, uint8_t size)
 {
     uint8_t i, j, byte_index;
     uint8_t change_mask, offset_mask;
@@ -191,7 +191,7 @@ void uart_send_report_nkro(report_nkro_t *report) {
 /**
  * @brief  Parsing the data received from the RF module.
  */
-void RF_Protocol_Receive(void) {
+static void RF_Protocol_Receive(void) {
     uint8_t i, check_sum = 0;
 
     if (Usart_Mgr.RXDState == RX_Done) {
@@ -497,7 +497,7 @@ void dev_sts_sync(void) {
                 disconnect_delay++;
             }
         }
-        else if (dev_info.rf_state == RF_CONNECT) {
+        else {
             rf_linking_time  = 0;
             disconnect_delay = 0;
             rf_blink_cnt     = 0;
@@ -540,7 +540,7 @@ void dev_sts_sync(void) {
  * @param Buffer data buf
  * @param Length data length
  */
-void UART_Send_Bytes(uint8_t *Buffer, uint32_t Length) {
+static void UART_Send_Bytes(const uint8_t *Buffer, uint32_t Length) {
     writePinLow(NRF_WAKEUP_PIN);
     wait_us(50);
 
@@ -555,7 +555,7 @@ void UART_Send_Bytes(uint8_t *Buffer, uint32_t Length) {
  * @param buf data buf
  * @param len data length
  */
-uint8_t get_checksum(uint8_t *buf, uint8_t len) {
+static uint8_t get_checksum(const uint8_t *buf, uint8_t len) {
     uint8_t i;
     uint8_t checksum = 0;
 
@@ -573,7 +573,7 @@ uint8_t get_checksum(uint8_t *buf, uint8_t len) {
  * @param report_buf  report_buf
  * @param report_size  report_size
  */
-void uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_size) {
+void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t report_size) {
     if (f_dial_sw_init_ok == 0) return;
     if (dev_info.link_mode == LINK_USB) return;
     /* Let RF module handle its own state -- don't drop reports during pairing/linking. */
