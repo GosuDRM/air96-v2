@@ -24,8 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+
+    - name: Clone submodule dependencies
+      run: |
+        git clone --depth 1 https://github.com/qmk/ChibiOS lib/chibios
+        git clone --depth 1 https://github.com/qmk/ChibiOS-Contrib lib/chibios-contrib
+        git clone --depth 1 https://github.com/qmk/lufa lib/lufa
+        git clone --depth 1 https://github.com/qmk/v-usb lib/vusb
+        git clone --depth 1 https://github.com/qmk/printf lib/printf
+
     - name: Install deps
       run: |
         sudo apt-get update -qq
