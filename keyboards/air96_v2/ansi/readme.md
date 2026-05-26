@@ -42,5 +42,5 @@ make air96_v2/ansi:via
 
 ## Version
 
-**v3.0.0** — GosuDRM
+**v3.0.1** — GosuDRM
 STM32F072 · IS31FL3733 RGB driver · 460800 baud UART to NRF wireless module

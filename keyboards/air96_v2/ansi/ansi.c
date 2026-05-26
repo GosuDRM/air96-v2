@@ -673,6 +673,7 @@ void keyboard_post_init_kb(void)
     m_break_all_key();           
     keyboard_post_init_user();
     m_londing_eeprom_data();    
+    m_host_driver = host_get_driver();
     m_power_on_dial_sw_scan();
     f_dial_sw_init_ok = 1;  /* allow reports immediately after init */
 }

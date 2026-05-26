@@ -60,9 +60,14 @@ static void uart_auto_nkey_send(uint8_t *pre_bit_report, uint8_t *now_bit_report
     uint8_t key_code = 0;
     bool f_byte_send = 0, f_bit_send = 0;
 
+    uart_bit_report_buf[0] = now_bit_report[0];
+
     if (pre_bit_report[0] ^ now_bit_report[0]) {
         bytekb_report_buf[0] = now_bit_report[0];
         f_byte_send          = 1;
+        if (f_bit_kb_act) {
+            f_bit_send = 1;
+        }
     }
 
     for (i = 1; i < size; i++) {
@@ -181,8 +186,8 @@ void uart_send_report_keyboard(report_keyboard_t *report) {
  */
 void uart_send_report_nkro(report_nkro_t *report) {
     no_act_time = 0;
-    uart_auto_nkey_send(bitkb_report_buf, &nkro_report->mods, NKRO_REPORT_BITS + 1);
-    memcpy(&bitkb_report_buf[0], &nkro_report->mods, NKRO_REPORT_BITS + 1);
+    uart_auto_nkey_send(bitkb_report_buf, &report->mods, NKRO_REPORT_BITS + 1);
+    memcpy(&bitkb_report_buf[0], &report->mods, NKRO_REPORT_BITS + 1);
 }
 
 /**
@@ -614,30 +619,48 @@ void uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_s
  * @brief Uart receives data and processes it after completion,.
  */
 void uart_receive_pro(void) {
-    static bool rcv_start = false;
-
-    // Receiving serial data from RF module
     while (uart_available()) {
-        rcv_start = true;
+        uint8_t b = uart_read();
 
-        if (Usart_Mgr.RXDLen >= UART_MAX_LEN) {
-            uart_read();
+        if (Usart_Mgr.RXDLen == 0) {
+            if (b == UART_HEAD) {
+                Usart_Mgr.RXDBuf[0] = b;
+                Usart_Mgr.RXDLen = 1;
+            }
+        }
+        else if (Usart_Mgr.RXDLen == 1) {
+            Usart_Mgr.RXDBuf[1] = b;
+            Usart_Mgr.RXDLen = 2;
+        }
+        else if (Usart_Mgr.RXDLen == 2) {
+            Usart_Mgr.RXDBuf[2] = b;
+            Usart_Mgr.RXDLen = 3;
+            if (b == 0xA0) {
+                Usart_Mgr.RXDState = RX_Done;
+                RF_Protocol_Receive();
+                Usart_Mgr.RXDLen = 0;
+                Usart_Mgr.RXDState = RX_Idle;
+            }
+        }
+        else if (Usart_Mgr.RXDLen == 3) {
+            Usart_Mgr.RXDBuf[3] = b;
+            Usart_Mgr.RXDLen = 4;
         }
         else {
-            Usart_Mgr.RXDBuf[Usart_Mgr.RXDLen++] = uart_read();
+            if (Usart_Mgr.RXDLen < UART_MAX_LEN) {
+                Usart_Mgr.RXDBuf[Usart_Mgr.RXDLen++] = b;
+                if (Usart_Mgr.RXDLen == 5 + Usart_Mgr.RXDBuf[3]) {
+                    Usart_Mgr.RXDState = RX_Done;
+                    RF_Protocol_Receive();
+                    Usart_Mgr.RXDLen = 0;
+                    Usart_Mgr.RXDState = RX_Idle;
+                }
+            }
+            else {
+                Usart_Mgr.RXDLen = 0;
+                Usart_Mgr.RXDState = RX_Idle;
+            }
         }
-
-        if (!uart_available()) {
-            /* no more data -- process what we have */
-        }
-    }
-
-    // Processing received serial port protocol
-    if (rcv_start) {
-        rcv_start          = false;
-        Usart_Mgr.RXDState = RX_Done;
-        RF_Protocol_Receive();
-        Usart_Mgr.RXDLen   = 0;
     }
 }
 

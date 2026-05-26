@@ -674,6 +674,7 @@ void bat_led_show(void)
         }
         if (charge_state == 0x03) {
             bat_show_breath = true;
+            bat_show_flag   = true;
         }
     }
 

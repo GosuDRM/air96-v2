@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.0.1 — GosuDRM (2026-05-26)
+
+Additional codebase audit, critical bug fixes, and reliability improvements.
+
+### Bug Fixes
+
+- **UART NKRO Parameter Ignore** — Fixed `uart_send_report_nkro` ignoring its parameter and using global `nkro_report` instead. (rf.c)
+- **Missing Modifiers in Wireless NKRO** — Synced `uart_bit_report_buf[0]` modifiers and triggered immediate sending on modifier changes when NKRO is active to prevent modifier lag/flicker. (rf.c)
+- **UART Packet Fragmentation** — Refactored `uart_receive_pro` into a robust byte-by-byte parser tracking packet frames to prevent keystroke loss, lag, and connection drops. (rf.c)
+- **NULL Host Driver USB Boot** — Corrected USB startup initialization sequence by setting `m_host_driver` before scanning the dial switch. (ansi.c)
+- **Battery Charging Breathing LED Timeout** — Kept `bat_show_flag = true` while charging (`charge_state == 0x03`) to sustain the breathing animation continuously. (side.c)
+
+---
+
 ## v3.0.0 — GosuDRM (2025-05-25)
 
 Four-pass audit and optimization of the Air96 V2 QMK firmware
