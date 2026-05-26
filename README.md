@@ -47,9 +47,9 @@ Alternatively, you can download and use the graphical [QMK Toolbox](https://gith
 4. Check the **Auto-Flash** checkbox.
 5. Hold the **Escape** key and plug in the USB cable. The flashing process will start automatically.
 
-## 🌟 Evolution & Highlights (v3.0.0 → v3.0.7)
+## 🌟 Highlights (v3.0.0 → v3.0.7)
 
-This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable advancements achieved in the **v3.0.x** branch:
+This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable achievements in the **v3.0.x** branch:
 
 * **⚡ Zero-Latency Wake & Command Hardening:**
   Solved a critical wait-for-ACK loop blocking issue in `rf.c`, restoring immediate, non-blocking serial parsing. Wireless startup dead-time has been slashed **5.4×** (1250ms → 230ms), and inline wakeup logic ensures that the first keystroke after deep sleep is preserved and registered within `2.7ms` (previously lost + 75ms).
