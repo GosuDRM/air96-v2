@@ -41,12 +41,9 @@ jobs:
         VERSION="${{ github.ref_name }}"
         VERSION_NUM="${VERSION#v}"
         awk -v ver="$VERSION_NUM" '
-          BEGIN { found=0 }
-          /^## v/ {
-            if (found) exit
-            if ($2 == "v"ver) found=1
-          }
+          /^## v3\.0\.0/ { found=1 }
           found { print }
+          $0 ~ "^## v" ver " " { if (found && $2 != "v3.0.0") exit }
         ' CHANGELOG.md > /tmp/release_notes.md
         cat /tmp/release_notes.md
 
