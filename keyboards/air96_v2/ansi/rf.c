@@ -371,24 +371,18 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
         }
 
         case CMD_SET_NAME: {
-            Usart_Mgr.TXDBuf[3]  = 17;
+            Usart_Mgr.TXDBuf[3]  = 11;
             Usart_Mgr.TXDBuf[4]  = 1;
-            Usart_Mgr.TXDBuf[5]  = 15;
-            Usart_Mgr.TXDBuf[6]  = 'N';
-            Usart_Mgr.TXDBuf[7]  = 'u';
-            Usart_Mgr.TXDBuf[8]  = 'P';
-            Usart_Mgr.TXDBuf[9]  = 'h';
-            Usart_Mgr.TXDBuf[10] = 'y';
+            Usart_Mgr.TXDBuf[5]  = 9;
+            Usart_Mgr.TXDBuf[6]  = 'A';
+            Usart_Mgr.TXDBuf[7]  = 'i';
+            Usart_Mgr.TXDBuf[8]  = 'r';
+            Usart_Mgr.TXDBuf[9]  = '9';
+            Usart_Mgr.TXDBuf[10] = '6';
             Usart_Mgr.TXDBuf[11] = ' ';
-            Usart_Mgr.TXDBuf[12] = 'A';
-            Usart_Mgr.TXDBuf[13] = 'i';
-            Usart_Mgr.TXDBuf[14] = 'r';
-            Usart_Mgr.TXDBuf[15] = '9';
-            Usart_Mgr.TXDBuf[16] = '6';
-            Usart_Mgr.TXDBuf[17] = ' ';
-            Usart_Mgr.TXDBuf[18] = 'V';
-            Usart_Mgr.TXDBuf[19] = '2';
-            Usart_Mgr.TXDBuf[20] = '-';
+            Usart_Mgr.TXDBuf[12] = 'V';
+            Usart_Mgr.TXDBuf[13] = '2';
+            Usart_Mgr.TXDBuf[14] = 0;
             /* Checksum computed by generic write after the switch */
             break;
         }
