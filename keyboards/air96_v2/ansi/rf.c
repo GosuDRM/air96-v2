@@ -287,6 +287,8 @@ void RF_Protocol_Receive(void) {
                 f_rf_read_data_ok = 1;
                 break;
             }
+            default:
+                break;
         }
 
         Usart_Mgr.RXDLen      = 0;
@@ -311,13 +313,7 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
     Usart_Mgr.TXDBuf[2] = 0x00;
 
     switch (cmd) {
-        case CMD_SLEEP: {
-            Usart_Mgr.TXDBuf[3] = 1;
-            Usart_Mgr.TXDBuf[4] = 0;
-            Usart_Mgr.TXDBuf[5] = 0;
-            break;
-        }
-
+        case CMD_SLEEP:
         case CMD_HAND: {
             Usart_Mgr.TXDBuf[3] = 1;
             Usart_Mgr.TXDBuf[4] = 0;

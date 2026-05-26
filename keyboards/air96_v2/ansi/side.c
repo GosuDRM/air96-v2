@@ -815,6 +815,7 @@ void m_side_led_show(void)
         case SIDE_BREATH:   side_breathe_mode_show();   break;
         case SIDE_STATIC:   side_static_mode_show();    break;
         case SIDE_OFF:      side_off_mode_show();       break;
+        default:                                        break;
     }
 
     bat_led_show();
