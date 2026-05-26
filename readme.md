@@ -1,36 +1,36 @@
-# Quantum Mechanical Keyboard Firmware
+# Air96 V2 — NuPhy QMK Firmware
 
-[![Current Version](https://img.shields.io/github/tag/qmk/qmk_firmware.svg)](https://github.com/qmk/qmk_firmware/tags)
-[![Discord](https://img.shields.io/discord/440868230475677696.svg)](https://discord.gg/Uq7gcHh)
-[![Docs Status](https://img.shields.io/badge/docs-ready-orange.svg)](https://docs.qmk.fm)
-[![GitHub contributors](https://img.shields.io/github/contributors/qmk/qmk_firmware.svg)](https://github.com/qmk/qmk_firmware/pulse/monthly)
-[![GitHub forks](https://img.shields.io/github/forks/qmk/qmk_firmware.svg?style=social&label=Fork)](https://github.com/qmk/qmk_firmware/)
+Fork of QMK firmware for the NuPhy Air96 V2 wireless mechanical keyboard.
 
-This is a keyboard firmware based on the [tmk\_keyboard firmware](https://github.com/tmk/tmk_keyboard) with some useful features for Atmel AVR and ARM controllers, and more specifically, the [OLKB product line](https://olkb.com), the [ErgoDox EZ](https://ergodox-ez.com) keyboard, and the Clueboard product line.
+Only the `air96_v2/ansi` keyboard is maintained. All other keyboards have been
+removed to keep this repository focused and lightweight.
 
-## Documentation
+## Build
 
-* [See the official documentation on docs.qmk.fm](https://docs.qmk.fm)
+```bash
+qmk compile -kb air96_v2/ansi -km default
+```
 
-The docs are powered by [Docsify](https://docsify.js.org/) and hosted on [GitHub](/docs/). They are also viewable offline; see [Previewing the Documentation](https://docs.qmk.fm/#/contributing?id=previewing-the-documentation) for more details.
+Binary output: `air96_v2_ansi_default.bin`
 
-You can request changes by making a fork and opening a [pull request](https://github.com/qmk/qmk_firmware/pulls), or by clicking the "Edit this page" link at the bottom of any page.
+## Flash
 
-## Supported Keyboards
+Hold Escape while plugging in USB to enter DFU mode, then:
 
-* [Planck](/keyboards/planck/)
-* [Preonic](/keyboards/preonic/)
-* [ErgoDox EZ](/keyboards/ergodox_ez/)
-* [Clueboard](/keyboards/clueboard/)
-* [Cluepad](/keyboards/clueboard/17/)
-* [Atreus](/keyboards/atreus/)
+```bash
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96_v2_ansi_default.bin
+```
 
-The project also includes community support for [lots of other keyboards](/keyboards/).
+## Features
 
-## Maintainers
+- Bluetooth LE + 2.4 GHz wireless (NRF52832 module)
+- Wired USB HID (keyboard + consumer + system control)
+- 5-layer keymap (Mac/Win base + Fn layers)
+- Side LED animations (wave/mix/static/breath/off)
+- Dual IS31FL3733 RGB matrix (110 LEDs)
+- EEPROM config persistence
+- DFU bootloader entry (Escape key at boot)
 
-QMK is developed and maintained by Jack Humbert of OLKB with contributions from the community, and of course, [Hasu](https://github.com/tmk). The OLKB product firmwares are maintained by [Jack Humbert](https://github.com/jackhumbert), the Ergodox EZ by [ZSA Technology Labs](https://github.com/zsa), the Clueboard by [Zach White](https://github.com/skullydazed), and the Atreus by [Phil Hagelberg](https://github.com/technomancy).
+## License
 
-## Official Website
-
-[qmk.fm](https://qmk.fm) is the official website of QMK, where you can find links to this page, the documentation, and the keyboards supported by QMK.
+GPL-2.0-or-later — derived from QMK firmware and NuPhy's keyboard code.

@@ -1,0 +1,27 @@
+name: Build Air96 V2 Firmware
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install QMK CLI
+      run: python3 -m pip install qmk
+
+    - name: Setup QMK
+      run: qmk setup -H $(pwd) -y
+
+    - name: Compile Air96 V2
+      run: qmk compile -kb air96_v2/ansi -km default
+
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: air96-v2-firmware
+        path: air96_v2_ansi_default.bin
