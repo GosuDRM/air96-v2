@@ -703,12 +703,16 @@ void rf_uart_init(void) {
  */
 static bool rf_init_try_cmd(uint8_t cmd, volatile bool *ok_flag) {
     uint8_t timeout = 10;
-    *ok_flag = 0;
+    *ok_flag = false;
     while (timeout--) {
         uart_send_cmd(cmd, 0, 5);
-        uart_receive_pro();
-        uart_receive_pro();
-        if (*ok_flag) return true;
+        for (uint8_t i = 0; i < 10; i++) {
+            wait_ms(1);
+            uart_receive_pro();
+            if (*ok_flag) {
+                return true;
+            }
+        }
     }
     return false;
 }

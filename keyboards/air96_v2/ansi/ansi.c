@@ -634,7 +634,10 @@ static void timer_pro(void)
     if (f_first) {
         f_first        = false;
         interval_timer = timer_read32();
-        m_host_driver  = host_get_driver();
+        host_driver_t *current_driver = host_get_driver();
+        if (current_driver != &rf_host_driver) {
+            m_host_driver = current_driver;
+        }
     }
 
     if (timer_elapsed32(interval_timer) < 10) {
@@ -700,7 +703,10 @@ void keyboard_post_init_kb(void)
     m_break_all_key();           
     keyboard_post_init_user();
     m_londing_eeprom_data();    
-    m_host_driver = host_get_driver();
+    host_driver_t *current_driver = host_get_driver();
+    if (current_driver != &rf_host_driver) {
+        m_host_driver = current_driver;
+    }
     m_power_on_dial_sw_scan();
     f_dial_sw_init_ok = 1;  /* allow reports immediately after init */
     numlock_phase   = 1;    /* trigger NumLock press next housekeeping */

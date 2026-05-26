@@ -2,14 +2,21 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.0.8 (2026-05-26)
+*Wired latency, host driver fixes, and RF init timeouts.*
+
+- **Faster wired typing**: Set USB polling to 1000Hz (1ms) and switched to per-key debouncing that registers keypresses on the first scan — zero added latency.
+- **Fixed mode switching lockup**: The USB host driver is no longer overwritten when booting in wireless mode, so switching back to wired works reliably.
+- **Smarter RF startup**: Added a proper response timeout when initializing the wireless module, avoiding redundant command spam and fixing startup communication races.
+
 ## v3.0.7 (2026-05-26)
 *Safety hardening, wireless protocol checks, and animation fixes.*
 
-- **Fixed Wireless Auto-Sleep Bugs**: Hardened the sleep handler (`Sleep_Handle`) to guarantee critical sleep operations (such as USB suspend, RF disconnect, and connection timeout) are executed even if auto-sleep on inactivity is disabled.
-- **Fixed UART Protocol Bounds Checks**: Added robust packet length verification (`RX_LEN`) when processing `CMD_READ_DATA` and `CMD_RF_STS_SYSC` wireless status packets, preventing out-of-bounds/stale memory read vulnerabilities on truncated/corrupted UART packets.
-- **Fixed LED Animation Underflow**: Refactored `light_point_playing` circular animation indexing to prevent integer underflow/overflow, making it type-agnostic and correct for larger step values.
-- **Fixed Perpetual Battery Breathing on Wired**: The right-side battery charging breath animation no longer runs indefinitely in USB mode — fires once per full-charge transition, then honors the 5-second timeout.
-- **Hardened EEPROM Config Load**: Side LED config values (`side_mode`, `side_colour`, etc.) are now clamped to valid ranges after EEPROM read to prevent out-of-bounds table access on corrupted/stale config.
+- **Auto-sleep works in all modes**: Sleep operations (USB suspend, wireless disconnect, connection timeout) now execute correctly regardless of the auto-sleep setting.
+- **Safer wireless packets**: Added length checks on incoming wireless status data to guard against corrupted packets causing crashes or stale readings.
+- **Smoother LED animations**: Fixed a math bug in the circular color cycling that could glitch at certain speeds.
+- **Battery indicator no longer gets stuck**: The right-side orange breathing animation now shows once when fully charged, then turns off instead of running forever while plugged in.
+- **Safer settings recovery**: Side LED color and mode settings loaded from memory are validated and clamped to safe values, preventing random flashes if the stored config is corrupted.
 
 ## v3.0.6 (2026-05-26)
 *Comprehensive bug-fixing, C code smells refactoring, and memory footprint optimizations.*
