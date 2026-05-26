@@ -27,9 +27,6 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install qmk
 
-    - name: Setup QMK
-      run: qmk setup -H $(pwd) -y
-
     - name: Compile Air96 V2
       run: qmk compile -kb air96_v2/ansi -km default
 
