@@ -54,7 +54,6 @@ bool f_dev_reset_press  = 0;
 bool f_rgb_test_press   = 0;  
 bool f_bat_num_show     = 0;
 bool f_numlock_init     = 0;  /* one-shot NumLock check at boot */
-uint8_t numlock_delay   = 0;  /* ticks to wait before NumLock check */
 
 uint8_t host_mode;
 host_driver_t *m_host_driver   = 0;
@@ -683,7 +682,6 @@ void keyboard_post_init_kb(void)
     m_power_on_dial_sw_scan();
     f_dial_sw_init_ok = 1;  /* allow reports immediately after init */
     f_numlock_init  = 1;  /* trigger NumLock check in housekeeping */
-    numlock_delay   = 50; /* ~2.5s delay for USB enumeration */
 }
 
 /**
@@ -723,18 +721,17 @@ void housekeeping_task_kb(void)
 
     m_side_led_show();
 
-    /* One-shot NumLock ON at boot — deferred until USB enumerates.
-       Counter-based delay avoids racing USB setup on first tick. */
+    /* One-shot NumLock ON at boot — matches Rust firmware approach:
+       wait for USB_DEVICE_STATE_CONFIGURED, then send raw NumLock report. */
     if (f_numlock_init) {
-        if (numlock_delay > 0) {
-            numlock_delay--;
-        } else {
+        if (usb_device_state == USB_DEVICE_STATE_CONFIGURED) {
             f_numlock_init = 0;
-            if (!(host_keyboard_leds() & 0x01)) {
-                register_code(KC_NUM_LOCK);
-                wait_ms(50);
-                unregister_code(KC_NUM_LOCK);
-            }
+            report_keyboard_t rpt = {0};
+            rpt.keys[0] = 0x53; // HID usage: Keyboard Num Lock and Clear
+            host_keyboard_send(&rpt);
+            wait_ms(10);
+            rpt.keys[0] = 0;
+            host_keyboard_send(&rpt);
         }
     }
 }
