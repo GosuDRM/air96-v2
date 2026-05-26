@@ -707,13 +707,15 @@ void housekeeping_task_kb(void)
 
     uart_send_report_func();
 
-    dev_sts_sync();
-
     long_press_key();
 
     dial_sw_scan();
 
-    m_side_led_show();
-
     Sleep_Handle();
+
+    /* Lower priority — rate-limited and/or slow (I2C).
+       Placed last to minimize impact on scan-to-report latency. */
+    dev_sts_sync();
+
+    m_side_led_show();
 }

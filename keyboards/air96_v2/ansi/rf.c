@@ -130,7 +130,6 @@ void uart_send_report_func(void)
         interval_timer = timer_read32();
         if (no_act_time <= 200) {
             uart_send_report(CMD_RPT_BYTE_KB, bytekb_report_buf, 8);
-            wait_us(200);
 
             if(f_bit_kb_act)
             uart_send_report(CMD_RPT_BIT_KB, uart_bit_report_buf, 16);
@@ -310,13 +309,12 @@ void RF_Protocol_Receive(void) {
  * @param  delayms: delay before sending.
  */
 uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
-    wait_ms(delayms);
-
-    memset(&Usart_Mgr.TXDBuf[0], 0, UART_MAX_LEN);
+    if (delayms) wait_ms(delayms);
 
     Usart_Mgr.TXDBuf[0] = UART_HEAD;
     Usart_Mgr.TXDBuf[1] = cmd;
     Usart_Mgr.TXDBuf[2] = 0x00;
+    Usart_Mgr.TXDBuf[3] = 0;
 
     switch (cmd) {
         case CMD_SLEEP:
@@ -522,14 +520,17 @@ void dev_sts_sync(void) {
 
     /* In USB mode, only sync every ~2 seconds (10 × 200ms) for battery info.
        In RF mode, sync every 200ms for connection state. */
+    /* Fire-and-forget: no pre-delay, no ACK wait.
+       The ACK is picked up by uart_receive_pro() on the next cycle.
+       Saves ~2ms of blocking per sync. */
     if (dev_info.link_mode == LINK_USB) {
         if (++usb_sync_prescaler >= 10) {
             usb_sync_prescaler = 0;
-            uart_send_cmd(CMD_RF_STS_SYSC, 1, 1);
+            uart_send_cmd(CMD_RF_STS_SYSC, 0, 0);
         }
     } else {
         usb_sync_prescaler = 0;
-        uart_send_cmd(CMD_RF_STS_SYSC, 1, 1);
+        uart_send_cmd(CMD_RF_STS_SYSC, 0, 0);
     }
 
     if (dev_info.link_mode != LINK_USB && reset_cooldown == 0) {
