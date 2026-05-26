@@ -53,7 +53,7 @@ bool f_rf_sw_press      = 0;
 bool f_dev_reset_press  = 0;  
 bool f_rgb_test_press   = 0;  
 bool f_bat_num_show     = 0;
-bool f_numlock_init     = 0;  /* one-shot NumLock check at boot */
+uint8_t numlock_phase   = 0;  /* 0=idle, 1=press sent, 2=release next */
 
 uint8_t host_mode;
 host_driver_t *m_host_driver   = 0;
@@ -681,7 +681,7 @@ void keyboard_post_init_kb(void)
     m_host_driver = host_get_driver();
     m_power_on_dial_sw_scan();
     f_dial_sw_init_ok = 1;  /* allow reports immediately after init */
-    f_numlock_init  = 1;  /* trigger NumLock check in housekeeping */
+    numlock_phase   = 1;    /* trigger NumLock press next housekeeping */
 }
 
 /**
@@ -721,17 +721,14 @@ void housekeeping_task_kb(void)
 
     m_side_led_show();
 
-    /* One-shot NumLock ON at boot — matches Rust firmware approach:
-       wait for USB_DEVICE_STATE_CONFIGURED, then send raw NumLock report. */
-    if (f_numlock_init) {
-        if (usb_device_state == USB_DEVICE_STATE_CONFIGURED) {
-            f_numlock_init = 0;
-            report_keyboard_t rpt = {0};
-            rpt.keys[0] = 0x53; // HID usage: Keyboard Num Lock and Clear
-            host_keyboard_send(&rpt);
-            wait_ms(10);
-            rpt.keys[0] = 0;
-            host_keyboard_send(&rpt);
-        }
+    /* One-shot NumLock ON at boot. Uses register_code/unregister_code
+       across two housekeeping ticks so the key is in the report when
+       the main loop sends it. Matches Rust firmware approach. */
+    if (numlock_phase == 1 && usb_device_state == USB_DEVICE_STATE_CONFIGURED) {
+        register_code(KC_NUM_LOCK);
+        numlock_phase = 2;
+    } else if (numlock_phase == 2) {
+        unregister_code(KC_NUM_LOCK);
+        numlock_phase = 0;
     }
 }
