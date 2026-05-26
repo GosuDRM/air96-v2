@@ -10,8 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
-    - name: Install QMK and deps
+    - name: Install system deps
+      run: sudo apt-get update -qq && sudo apt-get install -y gcc-arm-none-eabi
+
+    - name: Install QMK and python deps
       run: |
         python3 -m pip install -r requirements.txt
         python3 -m pip install qmk
