@@ -13,16 +13,16 @@ jobs:
   regen:
     runs-on: ubuntu-latest
 
-    container: ghcr.io/qmk/qmk_cli
-
     steps:
-    - name: Disable safe.directory check
-      run : git config --global --add safe.directory '*'
-
     - uses: actions/checkout@v4
+
+    - name: Install QMK CLI
+      run: |
+        python3 -m pip install qmk
 
     - name: Run qmk generators
       run: |
+        qmk setup -H $(pwd) -y
         util/regen.sh
         git diff
 
