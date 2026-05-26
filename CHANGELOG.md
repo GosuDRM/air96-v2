@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.5 — GosuDRM (2026-05-26)
+
+NumLock ON at boot: host_keyboard_leds() poll + conditional tap_code(KC_NUM_LOCK) after 500ms post-init delay. Works across Windows, Linux, macOS regardless of previous state.
+
+### Added
+
+- **NumLock auto-on at boot** — Checks HID LED state in `keyboard_post_init_kb()` after 500ms USB settle delay. Only taps NumLock if currently off, avoiding double-toggle.
+
 ## v3.0.4 — GosuDRM (2026-05-26)
 
 Code quality: cppcheck and clang-tidy lint pass. Applied static linkage, const-correctness, and redundant-branch fixes across all Air96 source files.

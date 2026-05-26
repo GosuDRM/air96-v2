@@ -680,6 +680,10 @@ void keyboard_post_init_kb(void)
     m_host_driver = host_get_driver();
     m_power_on_dial_sw_scan();
     f_dial_sw_init_ok = 1;  /* allow reports immediately after init */
+    wait_ms(500);
+    if (!(host_keyboard_leds() & 0x01)) {
+        tap_code(KC_NUM_LOCK);  /* ensure NumLock ON at boot */
+    }
 }
 
 /**
