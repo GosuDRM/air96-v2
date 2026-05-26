@@ -60,7 +60,7 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 * **🧹 Code Quality & Footprint Optimization:**
   Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **shrinking the final binary footprint to 56,366 bytes** (down from 56,490 bytes).
 * **📜 Full Revision History:**
-  See [CHANGELOG.md](CHANGELOG.md) for the complete, human-readable record of all engineering optimizations, bug fixes, and releases.
+  See [CHANGELOG.md](CHANGELOG.md) for the complete record of all engineering optimizations, bug fixes, and releases.
 
 ### 📊 Performance & Optimization Summary
 

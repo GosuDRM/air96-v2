@@ -16,7 +16,7 @@ This firmware has been extensively audited, bug-fixed, and performance-hardened 
 - **🔋 Power Consumption & USB Compliance** — Prescaled state synchronization checks in wired mode to save 2-3mA on battery. The sleep handler has been hardened to force LED and NRF power-downs during USB suspend even when auto-sleep is disabled, fully satisfying the USB suspend current draw limits (0.5mA / 2.5mA max).
 - **🧠 Layout & UX Refinements** — Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
 - **🧹 Code Quality & Footprint Optimization** — Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **shrinking the final binary footprint to 56,366 bytes** (down from 56,490 bytes).
-- **📜 Full Revision History** — See [CHANGELOG.md](../../../CHANGELOG.md) for the complete, human-readable record of all optimizations, bug fixes, and releases.
+- **📜 Full Revision History** — See [CHANGELOG.md](../../../CHANGELOG.md) for the complete record of all optimizations, bug fixes, and releases.
 
 ## 🛠️ Build
 
