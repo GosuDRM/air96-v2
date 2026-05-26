@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.3 — GosuDRM (2026-05-26)
+
+Latency optimization: eliminated ~2ms blocking in main loop, reordered housekeeping.
+
+### Fixed
+
+- **Main Loop Blocking** — Eliminated ~2ms idle wait in `housekeeping_task()` by reordering the wireless state sync and sleep checks to run concurrently with the USB poll. Reduces minimum keystroke latency.
+
 ## v3.0.2 — GosuDRM (2026-05-26)
 
 Wireless subsystem audit: 3 critical bugs, 2 high-severity issues, 2 medium robustness fixes, and 6 optimizations. Binary size reduced by 56 bytes.
