@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include <stdint.h>
+
 #define	STARRY_INDEX_LEN		(160)
 #define	WAVE_TAB_LEN			112
 #define	BREATHE_TAB_LEN			128
@@ -343,7 +345,7 @@ const uint8_t	flow_rainbow_colour_tab[FLOW_COLOUR_TAB_LEN][3]=
 //----------------------------------------------------------------
 //		color table
 //----------------------------------------------------------------
-const uint8_t colour_lib[9][3] =
+const uint8_t colour_lib[8][3] =
 {
 	{0xff, 0x00, 0x00},		   
 	{0xff, 0x40, 0x00},         
@@ -353,6 +355,5 @@ const uint8_t colour_lib[9][3] =
 	{0x00, 0x00, 0xff},         
 	{0x80, 0x00, 0xff},         
 	{0xc0, 0xc0, 0xff},         
-	{0x00, 0x00, 0x00},         
 };
 

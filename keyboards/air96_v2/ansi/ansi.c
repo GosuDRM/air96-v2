@@ -131,14 +131,16 @@ static void long_press_key(void)
 {
     static uint32_t long_press_timer = 0;
 
-    if (timer_elapsed32(long_press_timer) < 50) return;
+    if (timer_elapsed32(long_press_timer) < 50) {
+        return;
+    }
     long_press_timer = timer_read32();
 
     if (f_rf_sw_press) {
         rf_sw_press_delay++;
         if (rf_sw_press_delay >= RF_LONG_PRESS_DELAY)
         {
-            f_rf_sw_press = 0;
+            f_rf_sw_press = false;
             dev_info.link_mode   = rf_sw_temp;
             dev_info.rf_channel  = rf_sw_temp;
             dev_info.ble_channel = rf_sw_temp;
@@ -148,7 +150,9 @@ static void long_press_key(void)
                 uart_send_cmd(CMD_NEW_ADV, 0, 1);
                 wait_ms(20);
                 uart_receive_pro();                   
-                if (f_rf_new_adv_ok) break;
+                if (f_rf_new_adv_ok) {
+                    break;
+                }
             }
         }
     } else {
@@ -158,7 +162,7 @@ static void long_press_key(void)
     if (f_dev_reset_press) {
         dev_reset_press_delay++;
         if (dev_reset_press_delay >= DEV_RESET_PRESS_DELAY)  {
-            f_dev_reset_press = 0;                 
+            f_dev_reset_press = false;                 
 
             if (dev_info.link_mode != LINK_USB) {
                 if (dev_info.link_mode != LINK_RF_24) {
@@ -192,7 +196,7 @@ static void long_press_key(void)
     if (f_rgb_test_press) {
         rgb_test_press_delay++;
         if (rgb_test_press_delay >= RGB_TEST_PRESS_DELAY) {
-            f_rgb_test_press = 0;
+            f_rgb_test_press = false;
             rgb_test_show(); 
         }
     } else {
@@ -205,19 +209,18 @@ static void long_press_key(void)
  */
 void m_break_all_key(void)
 {
-    uint8_t report_buf[16];
     bool nkro_temp = keymap_config.nkro; 
 
     clear_weak_mods();
     clear_mods();
     clear_keyboard();
 
-    keymap_config.nkro = 1;
+    keymap_config.nkro = true;
     memset(nkro_report, 0, sizeof(report_nkro_t));
     host_nkro_send(nkro_report);
     wait_ms(10);
 
-    keymap_config.nkro = 0;
+    keymap_config.nkro = false;
     memset(keyboard_report, 0, sizeof(report_keyboard_t));
     host_keyboard_send(keyboard_report);
     wait_ms(10);
@@ -225,6 +228,7 @@ void m_break_all_key(void)
     keymap_config.nkro = nkro_temp;
 
     if (dev_info.link_mode != LINK_USB) {
+        uint8_t report_buf[16];
         memset(report_buf, 0, 16);
         uart_send_report(CMD_RPT_BIT_KB, report_buf, 16);
         wait_ms(10);
@@ -238,7 +242,7 @@ void m_break_all_key(void)
 
     /* Clear NKRO active flag to stop periodic resends of stale bit reports */
     extern bool f_bit_kb_act;
-    f_bit_kb_act = 0;
+    f_bit_kb_act = false;
 }
 
 /**
@@ -278,15 +282,21 @@ static void dial_sw_scan(void)
     static bool     f_first         = true;
 
     if (!f_first) {
-        if (timer_elapsed32(dial_scan_timer) < 20) return;
+        if (timer_elapsed32(dial_scan_timer) < 20) {
+            return;
+        }
     }
     dial_scan_timer = timer_read32();
 
     setPinInputHigh(DEV_MODE_PIN);
     setPinInputHigh(SYS_MODE_PIN);
 
-    if (readPin(DEV_MODE_PIN)) dial_scan |= 0X01;
-    if (readPin(SYS_MODE_PIN)) dial_scan |= 0X02;
+    if (readPin(DEV_MODE_PIN)) {
+        dial_scan |= 0X01;
+    }
+    if (readPin(SYS_MODE_PIN)) {
+        dial_scan |= 0X02;
+    }
 
     if (dial_save != dial_scan) {
         m_break_all_key(); 
@@ -296,7 +306,7 @@ static void dial_sw_scan(void)
 
         dial_save         = dial_scan;
         debounce          = 25;  
-        f_dial_sw_init_ok = 0;  
+        f_dial_sw_init_ok = false;  
         return;
     } else if (debounce) {
         debounce--;
@@ -315,24 +325,24 @@ static void dial_sw_scan(void)
 
     if (dial_scan & 0x02) {
         if (dev_info.sys_sw_state != SYS_SW_MAC) {
-            f_sys_show = 1;
+            f_sys_show = true;
             default_layer_set(1 << 0);  
             dev_info.sys_sw_state = SYS_SW_MAC;
-            keymap_config.nkro    = 0; 
+            keymap_config.nkro    = false; 
             m_break_all_key();        
         }
     } else {
         if (dev_info.sys_sw_state != SYS_SW_WIN) {
-            f_sys_show = 1;
+            f_sys_show = true;
             default_layer_set(1 << 2);  
             dev_info.sys_sw_state = SYS_SW_WIN;
-            keymap_config.nkro    = 1;  
+            keymap_config.nkro    = true;  
             m_break_all_key();        
         }
     }
 
-    if (f_dial_sw_init_ok == 0) {
-        f_dial_sw_init_ok = 1; 
+    if (!f_dial_sw_init_ok) {
+        f_dial_sw_init_ok = true; 
         f_first           = false;
 
         if (dev_info.link_mode != LINK_USB) {
@@ -348,22 +358,27 @@ static void m_power_on_dial_sw_scan(void)
 {
     uint8_t dial_scan_dev = 0;
     uint8_t dial_scan_sys = 0;
-    uint8_t dial_check_dev = 0;
-    uint8_t dial_check_sys = 0;
-    uint8_t debounce = 0;
 
     setPinInputHigh(DEV_MODE_PIN);      
     setPinInputHigh(SYS_MODE_PIN);     
 
-    for(debounce=0; debounce<10; debounce++) {
+    uint8_t dial_check_dev = 0;
+    uint8_t dial_check_sys = 0;
+
+    for (uint8_t debounce = 0; debounce < 10; debounce++) {
         dial_scan_dev = 0;
         dial_scan_sys = 0;
-        if (readPin(DEV_MODE_PIN)) dial_scan_dev = 0x01;
-        else dial_scan_dev = 0;
-        if (readPin(SYS_MODE_PIN)) dial_scan_sys = 0x01;
-        else dial_scan_sys = 0;
-        if((dial_scan_dev != dial_check_dev)||(dial_scan_sys != dial_check_sys))
-        {
+        if (readPin(DEV_MODE_PIN)) {
+            dial_scan_dev = 0x01;
+        } else {
+            dial_scan_dev = 0;
+        }
+        if (readPin(SYS_MODE_PIN)) {
+            dial_scan_sys = 0x01;
+        } else {
+            dial_scan_sys = 0;
+        }
+        if ((dial_scan_dev != dial_check_dev) || (dial_scan_sys != dial_check_sys)) {
             dial_check_dev = dial_scan_dev;
             dial_check_sys = dial_scan_sys;
             debounce = 0;
@@ -385,14 +400,14 @@ static void m_power_on_dial_sw_scan(void)
         if (dev_info.sys_sw_state != SYS_SW_MAC) {
             default_layer_set(1 << 0);  
             dev_info.sys_sw_state = SYS_SW_MAC;
-            keymap_config.nkro    = 0; 
+            keymap_config.nkro    = false; 
             m_break_all_key();  
         }
     } else {
         if (dev_info.sys_sw_state != SYS_SW_WIN) {
             default_layer_set(1 << 2);  
             dev_info.sys_sw_state = SYS_SW_WIN;
-            keymap_config.nkro    = 1; 
+            keymap_config.nkro    = true; 
             m_break_all_key();     
         }
     }

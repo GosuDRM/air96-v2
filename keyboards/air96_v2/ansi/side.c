@@ -568,17 +568,16 @@ static void bat_num_led(uint8_t bat_percent)
         r = 0x00; g = 0xff; b = 0x00;
     }
 
-    // set percent
-    if (bat_percent >= 1) rgb_matrix_set_color(29, r, g, b);
-    if (bat_percent > 10) rgb_matrix_set_color(28, r, g, b);
-    if (bat_percent > 20) rgb_matrix_set_color(27, r, g, b);
-    if (bat_percent > 30) rgb_matrix_set_color(26, r, g, b);
-    if (bat_percent > 40) rgb_matrix_set_color(25, r, g, b);
-    if (bat_percent > 50) rgb_matrix_set_color(24, r, g, b);
-    if (bat_percent > 60) rgb_matrix_set_color(23, r, g, b);
-    if (bat_percent > 70) rgb_matrix_set_color(22, r, g, b);
-    if (bat_percent > 80) rgb_matrix_set_color(21, r, g, b);
-    if (bat_percent > 90) rgb_matrix_set_color(20, r, g, b);
+    // set percent using array lookup
+    static const uint8_t battery_leds[10] = {29, 28, 27, 26, 25, 24, 23, 22, 21, 20};
+    if (bat_percent >= 1) {
+        rgb_matrix_set_color(battery_leds[0], r, g, b);
+    }
+    for (uint8_t i = 1; i < 10; i++) {
+        if (bat_percent > (i * 10)) {
+            rgb_matrix_set_color(battery_leds[i], r, g, b);
+        }
+    }
 }
 
 void num_led_show(void)
@@ -588,48 +587,43 @@ void num_led_show(void)
     bat_num_led(num_bat_temp);
 }
 
-void bat_led_close(void)
-{
-    for(int i=20; i<=29; i++) {
-        rgb_matrix_set_color(i,0,0,0);
-    }
-
-}
 
 /**
  * @brief  Battery level indicator
  */
-uint8_t bat_end_led        = 0;
-uint8_t bat_r, bat_g, bat_b;
+static uint8_t bat_end_led        = 0;
+static uint8_t bat_r, bat_g, bat_b;
 
 static void bat_percent_led(uint8_t bat_percent)
 {
     if (bat_percent <= 20) {
         bat_end_led = 0;
-        bat_r = SIDE_BLINK_LIGHT, bat_g = 0, bat_b = 0;
+        bat_r = SIDE_BLINK_LIGHT; bat_g = 0; bat_b = 0;
     } else if (bat_percent <= 30) {
         bat_end_led = 1;
-        bat_r = SIDE_BLINK_LIGHT, bat_g = SIDE_BLINK_LIGHT / 2, bat_b = 0;
+        bat_r = SIDE_BLINK_LIGHT; bat_g = SIDE_BLINK_LIGHT / 2; bat_b = 0;
     } else if (bat_percent <= 50) {
         bat_end_led = 2;
-        bat_r = SIDE_BLINK_LIGHT, bat_g = SIDE_BLINK_LIGHT / 2, bat_b = 0;
+        bat_r = SIDE_BLINK_LIGHT; bat_g = SIDE_BLINK_LIGHT / 2; bat_b = 0;
     } else if (bat_percent <= 70) {
         bat_end_led = 3;
-        bat_r = SIDE_BLINK_LIGHT, bat_g = SIDE_BLINK_LIGHT / 2, bat_b = 0;
+        bat_r = SIDE_BLINK_LIGHT; bat_g = SIDE_BLINK_LIGHT / 2; bat_b = 0;
     } else if (bat_percent <= 95) {
         bat_end_led = 4;
-        bat_r = SIDE_BLINK_LIGHT, bat_g = SIDE_BLINK_LIGHT / 2, bat_b = 0;
+        bat_r = SIDE_BLINK_LIGHT; bat_g = SIDE_BLINK_LIGHT / 2; bat_b = 0;
     } else {
         bat_end_led = 4;
-        bat_r = 0, bat_g = SIDE_BLINK_LIGHT, bat_b = 0;
+        bat_r = 0; bat_g = SIDE_BLINK_LIGHT; bat_b = 0;
     }
 
     uint8_t i;
-    for (i = 0; i <= bat_end_led; i++)
+    for (i = 0; i <= bat_end_led; i++) {
         rgb_matrix_set_color(SIDE_INDEX + 9 - i, bat_r, bat_g, bat_b);
+    }
 
-    for (; i < SIDE_LINE; i++)
+    for (; i < SIDE_LINE; i++) {
         rgb_matrix_set_color(SIDE_INDEX + 9 - i, 0, 0, 0);
+    }
 }
 
 /**

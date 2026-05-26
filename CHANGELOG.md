@@ -1,4 +1,21 @@
-# Changelog
+# 📝 Changelog
+
+## v3.0.6 (2026-05-26)
+
+Comprehensive bug-fixing, directory-wide code smells refactoring, and performance/memory optimization pass.
+
+### Fixed
+
+- **Critical UART command blocking** — Added `uart_receive_pro()` inside the `wait_ack` command loop in `rf.c` to prevent false-negative timeouts and eliminate 30+ms of unnecessary blocking during boot, wakeup, and channel switching.
+- **USB suspend power specification compliance** — Enforced NRF sleep and LED shutdown in `sleep.c` during USB suspend even when user sleep preference is disabled, complying with USB suspend power consumption limit (0.5mA / 2.5mA max).
+- **Undefined types in side.h** — Included `<stdint.h>` at the top of `side.h` to fully resolve standard integer types, removing all parser and IDE undefined type warning outlines.
+
+### Refactored & Optimized
+
+- **Removed magic numbers in battery LED indicator** — Refactored the 10 hardcoded `if` statements inside `bat_num_led()` in `side.c` to use a dynamic loop and static array lookup.
+- **Internal linkage enforcement** — Declared local globals (`bat_end_led`, `bat_r`, `bat_g`, `bat_b` in `side.c`) as `static` to clean up namespace.
+- **Style and brace cleanup** — Added explicit braces `{}` around all single-line `if`/`else` branches and resolved all implicit integer-to-boolean type conversions across `ansi.c`, `rf.c`, `sleep.c`, and `side.c`.
+- **Memory footprint reduction** — Removed unreachable 9th color entry in `colour_lib` and deleted dead `bat_led_close()` function, reducing binary size by **96 bytes** (down to 56,242 bytes)!
 
 ## v3.0.5 (2026-05-26)
 

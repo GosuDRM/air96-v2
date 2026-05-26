@@ -51,52 +51,53 @@ uint16_t       host_last_consumer_usage(void);
 /**
  * @brief Uart auto nkey send
  */
-bool f_bit_kb_act = 0;
+bool f_bit_kb_act = false;
 static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *now_bit_report, uint8_t size)
 {
-    uint8_t i, j, byte_index;
-    uint8_t change_mask, offset_mask;
+    uint8_t byte_index;
+    uint8_t offset_mask;
     uint8_t key_code = 0;
-    bool f_byte_send = 0, f_bit_send = 0;
+    bool f_byte_send = false;
+    bool f_bit_send = false;
 
     uart_bit_report_buf[0] = now_bit_report[0];
 
     if (pre_bit_report[0] ^ now_bit_report[0]) {
         bytekb_report_buf[0] = now_bit_report[0];
-        f_byte_send          = 1;
+        f_byte_send          = true;
         if (f_bit_kb_act) {
-            f_bit_send = 1;
+            f_bit_send = true;
         }
     }
 
-    for (i = 1; i < size; i++) {
-        change_mask = pre_bit_report[i] ^ now_bit_report[i];
+    for (uint8_t i = 1; i < size; i++) {
+        uint8_t change_mask = pre_bit_report[i] ^ now_bit_report[i];
         offset_mask = 1;
-        for (j = 0; j < 8; j++) {
+        for (uint8_t j = 0; j < 8; j++) {
             if (change_mask & offset_mask) {
                 if (now_bit_report[i] & offset_mask) {
                     for (byte_index = 2; byte_index < 8; byte_index++) {
                         if (bytekb_report_buf[byte_index] == 0) {
                             bytekb_report_buf[byte_index] = key_code;
-                            f_byte_send                   = 1;
+                            f_byte_send                   = true;
                             break;
                         }
                     }
                     if (byte_index >= 8) {
                         uart_bit_report_buf[i] |= offset_mask;
-                        f_bit_send = 1;
+                        f_bit_send = true;
                     }
                 } else {
                     for (byte_index = 2; byte_index < 8; byte_index++) {
                         if (bytekb_report_buf[byte_index] == key_code) {
                             bytekb_report_buf[byte_index] = 0;
-                            f_byte_send                   = 1;
+                            f_byte_send                   = true;
                             break;
                         }
                     }
                     if (byte_index >= 8) {
                         uart_bit_report_buf[i] &= ~offset_mask;
-                        f_bit_send = 1;
+                        f_bit_send = true;
                     }
                 }
             }
@@ -106,7 +107,7 @@ static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *no
     }
 
     if (f_bit_send) {
-        f_bit_kb_act = 1;
+        f_bit_kb_act = true;
         uart_send_report(CMD_RPT_BIT_KB, uart_bit_report_buf, 16);
     }
 
@@ -192,15 +193,14 @@ void uart_send_report_nkro(report_nkro_t *report) {
  * @brief  Parsing the data received from the RF module.
  */
 static void RF_Protocol_Receive(void) {
-    uint8_t i, check_sum = 0;
-
     if (Usart_Mgr.RXDState == RX_Done) {
-        f_uart_ack = 1;
+        f_uart_ack = true;
         sync_lost = 0;
 
         if (Usart_Mgr.RXDLen > 4) {
-            if((Usart_Mgr.RXDLen - 5) != RX_LEN) 
+            if ((Usart_Mgr.RXDLen - 5) != RX_LEN) {
                 return;
+            }
 
             /* Bounds check: RX_LEN comes from the RF module; reject if it
                would cause us to read past the end of RXDBuf. */
@@ -209,8 +209,11 @@ static void RF_Protocol_Receive(void) {
                 return;
             }
 
-            for (i = 0; i < RX_LEN; i++)
+            uint8_t check_sum = 0;
+            uint8_t i;
+            for (i = 0; i < RX_LEN; i++) {
                 check_sum += Usart_Mgr.RXDBuf[4 + i];
+            }
 
             if (check_sum != Usart_Mgr.RXDBuf[4 + i]) {
                 Usart_Mgr.RXDState = RX_SUM_ERR;
@@ -218,7 +221,7 @@ static void RF_Protocol_Receive(void) {
             }
         } else if (Usart_Mgr.RXDLen == 3) {
             if (Usart_Mgr.RXDBuf[2] == 0xA0) {
-                f_uart_ack = 1;
+                f_uart_ack = true;
             }
             else {
                 return;
@@ -229,17 +232,17 @@ static void RF_Protocol_Receive(void) {
 
         switch (RX_CMD) {
             case CMD_HAND: {
-                f_rf_hand_ok = 1;
+                f_rf_hand_ok = true;
                 break;
             }
 
             case CMD_24G_SUSPEND: {
-                f_goto_sleep = 1;
+                f_goto_sleep = true;
                 break;
             }
 
             case CMD_NEW_ADV: {
-                f_rf_new_adv_ok = 1;
+                f_rf_new_adv_ok = true;
                 break;
             }
 
@@ -257,20 +260,22 @@ static void RF_Protocol_Receive(void) {
 
                     dev_info.rf_charge = Usart_Mgr.RXDBuf[7];
 
-                    if (Usart_Mgr.RXDBuf[8] <= 100) dev_info.rf_baterry = Usart_Mgr.RXDBuf[8];
+                    if (Usart_Mgr.RXDBuf[8] <= 100) {
+                        dev_info.rf_baterry = Usart_Mgr.RXDBuf[8];
+                    }
                 }
                 else {
                     if (dev_info.rf_state != RF_INVALID) {
                         if (error_cnt >= 5) {
                             error_cnt      = 0;
-                            f_send_channel = 1;
+                            f_send_channel = true;
                         } else {
                             error_cnt++;
                         }
                     }
                 }
 
-                f_rf_sts_sysc_ok = 1;
+                f_rf_sts_sysc_ok = true;
                 break;
             }
 
@@ -289,7 +294,7 @@ static void RF_Protocol_Receive(void) {
                     dev_info.ble_channel = func_tab[6];
                 }
 
-                f_rf_read_data_ok = 1;
+                f_rf_read_data_ok = true;
                 break;
             }
             default:
@@ -429,6 +434,7 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
     if (wait_ack) {
         while (wait_ack--) {
             wait_ms(1);
+            uart_receive_pro();
             if (f_uart_ack) return TX_OK;
         }
     } else {
@@ -447,10 +453,10 @@ void dev_sts_sync(void) {
     static uint8_t  reset_cooldown      = 0;
     static uint8_t  usb_sync_prescaler  = 0;
 
-    if (timer_elapsed32(interval_timer) < 200)
+    if (timer_elapsed32(interval_timer) < 200) {
         return;
-    else
-        interval_timer = timer_read32();
+    }
+    interval_timer = timer_read32();
 
     /* Post-reset cooldown: skip sync_lost counting to give NRF time to boot */
     if (reset_cooldown > 0) {
@@ -458,7 +464,7 @@ void dev_sts_sync(void) {
     }
 
     if (f_rf_reset) {
-        f_rf_reset = 0;
+        f_rf_reset = false;
         wait_ms(100);
         writePinLow(NRF_RESET_PIN);
         wait_ms(50);
@@ -467,7 +473,7 @@ void dev_sts_sync(void) {
         reset_cooldown = 3;  /* ~600ms cooldown (3 × 200ms intervals) */
     }
     else if (f_send_channel) {
-        f_send_channel = 0;
+        f_send_channel = false;
         uart_send_cmd(CMD_SET_LINK, 10, 5);
     }
 
@@ -530,7 +536,7 @@ void dev_sts_sync(void) {
     if (dev_info.link_mode != LINK_USB && reset_cooldown == 0) {
         if (++sync_lost >= 10) {
             sync_lost  = 0;
-            f_rf_reset = 1;
+            f_rf_reset = true;
         }
     }
 }
@@ -574,8 +580,12 @@ static uint8_t get_checksum(const uint8_t *buf, uint8_t len) {
  * @param report_size  report_size
  */
 void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t report_size) {
-    if (f_dial_sw_init_ok == 0) return;
-    if (dev_info.link_mode == LINK_USB) return;
+    if (!f_dial_sw_init_ok) {
+        return;
+    }
+    if (dev_info.link_mode == LINK_USB) {
+        return;
+    }
     /* Let RF module handle its own state -- don't drop reports during pairing/linking. */
 
     /* If waking from sleep, power up RF module before sending the first report.
@@ -676,8 +686,7 @@ void rf_uart_init(void) {
     USART1->CR1 |= USART_CR1_UE;
 
     /* set Rx and Tx pin pull up */
-    /* FIXME: GPIO_OSPEEDER_OSPEEDR6 -- verify this macro exists in the target ChibiOS HAL.
-       The correct name may be GPIO_OSPEEDR_OSPEEDR6 (without the extra "ER"). */
+    /* GPIO_OSPEEDER_OSPEEDR6 is a standard vendor-provided alias for GPIO_OSPEEDR_OSPEEDR6. */
     GPIOB->OSPEEDR &= ~(GPIO_OSPEEDER_OSPEEDR6 | GPIO_OSPEEDER_OSPEEDR7);
     GPIOB->PUPDR |= (GPIO_PUPDR_PUPDR6_0 | GPIO_PUPDR_PUPDR7_0);
 }

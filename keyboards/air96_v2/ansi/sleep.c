@@ -39,17 +39,20 @@ void Sleep_Handle(void) {
     static uint32_t rf_disconnect_time = 0;
 
     /* 50ms interval */
-    if (timer_elapsed32(delay_step_timer) < 50) return;
+    if (timer_elapsed32(delay_step_timer) < 50) {
+        return;
+    }
     delay_step_timer = timer_read32();
 
     if (f_goto_sleep) {
-        f_goto_sleep = 0;
+        f_goto_sleep = false;
 
-        if(user_config.sleep_enable) {
-            if (dev_info.rf_state == RF_CONNECT)
+        if (user_config.sleep_enable || (dev_info.link_mode == LINK_USB)) {
+            if (dev_info.rf_state == RF_CONNECT) {
                 uart_send_cmd(CMD_SET_CONFIG, 5, 5);
-            else
+            } else {
                 uart_send_cmd(CMD_SLEEP, 5, 5);
+            }
 
             // power off led
             writePinLow(DC_BOOST_PIN);
@@ -57,11 +60,11 @@ void Sleep_Handle(void) {
             writePinLow(RGB_DRIVER_SDB2);
         }
 
-        f_wakeup_prepare = 1;
+        f_wakeup_prepare = true;
     }
 
     if (f_wakeup_prepare && (no_act_time < 10)) {
-        f_wakeup_prepare = 0;
+        f_wakeup_prepare = false;
 
         writePinHigh(DC_BOOST_PIN);
         writePinHigh(RGB_DRIVER_SDB1);
@@ -70,7 +73,7 @@ void Sleep_Handle(void) {
         uart_send_cmd(CMD_HAND, 0, 1);
 
         if (dev_info.link_mode == LINK_USB) {
-            if ((USB_DRIVER.status & USB_GETSTATUS_REMOTE_WAKEUP_ENABLED) ) {
+            if ((USB_DRIVER.status & USB_GETSTATUS_REMOTE_WAKEUP_ENABLED)) {
                 usb_lld_wakeup_host(&USB_DRIVER);
                 wait_ms(50);
                 uint8_t timeout = 10;
@@ -85,13 +88,15 @@ void Sleep_Handle(void) {
         }
     }
 
-    if (f_goto_sleep || f_wakeup_prepare) return;
+    if (f_goto_sleep || f_wakeup_prepare) {
+        return;
+    }
 
     if (dev_info.link_mode == LINK_USB) {
         if (USB_DRIVER.state == USB_SUSPENDED) {
             usb_suspend_debounce++;
             if (usb_suspend_debounce >= 20) {
-                f_goto_sleep = 1;
+                f_goto_sleep = true;
             }
         } else {
             usb_suspend_debounce = 0;
@@ -99,16 +104,16 @@ void Sleep_Handle(void) {
     } else if (dev_info.rf_state == RF_CONNECT) {
         rf_disconnect_time = 0;
         if (no_act_time >= SLEEP_TIME_DELAY) {
-            f_goto_sleep = 1;
+            f_goto_sleep = true;
         }
     } else if (rf_linking_time >= LINK_TIMEOUT) {
         rf_linking_time = 0;
-        f_goto_sleep    = 1;
+        f_goto_sleep    = true;
     } else if (dev_info.rf_state == RF_DISCONNECT) {
         rf_disconnect_time++;
         if (rf_disconnect_time > 5 * 20) {
             rf_disconnect_time = 0;
-            f_goto_sleep = 1;
+            f_goto_sleep = true;
         }
     }
 }
