@@ -20,7 +20,7 @@ jobs:
         git clone --depth 1 https://github.com/qmk/printf lib/printf
 
     - name: Install system deps
-      run: sudo apt-get update -qq && sudo apt-get install -y gcc-arm-none-eabi
+      run: sudo apt-get update -qq && sudo apt-get install -y gcc-arm-none-eabi dfu-util
 
     - name: Install QMK and python deps
       run: |
