@@ -677,6 +677,13 @@ static void m_londing_eeprom_data(void)
         side_rgb    = user_config.ee_side_rgb;
         side_colour = user_config.ee_side_colour;
     }
+
+    /* Clamp side config from EEPROM to prevent OOB on colour_lib[8] and other tables */
+    if (side_mode > 4) side_mode = 0;
+    if (side_light > 5) side_light = 3;
+    if (side_speed > 4) side_speed = 2;
+    if (side_rgb > 1) side_rgb = 1;
+    if (side_colour >= 8) side_colour = 0;
 }
 
 

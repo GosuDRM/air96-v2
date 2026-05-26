@@ -2,6 +2,15 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.0.7 (2026-05-26)
+*Safety hardening, wireless protocol checks, and animation fixes.*
+
+- **Fixed Wireless Auto-Sleep Bugs**: Hardened the sleep handler (`Sleep_Handle`) to guarantee critical sleep operations (such as USB suspend, RF disconnect, and connection timeout) are executed even if auto-sleep on inactivity is disabled.
+- **Fixed UART Protocol Bounds Checks**: Added robust packet length verification (`RX_LEN`) when processing `CMD_READ_DATA` and `CMD_RF_STS_SYSC` wireless status packets, preventing out-of-bounds/stale memory read vulnerabilities on truncated/corrupted UART packets.
+- **Fixed LED Animation Underflow**: Refactored `light_point_playing` circular animation indexing to prevent integer underflow/overflow, making it type-agnostic and correct for larger step values.
+- **Fixed Perpetual Battery Breathing on Wired**: The right-side battery charging breath animation no longer runs indefinitely in USB mode — fires once per full-charge transition, then honors the 5-second timeout.
+- **Hardened EEPROM Config Load**: Side LED config values (`side_mode`, `side_colour`, etc.) are now clamped to valid ranges after EEPROM read to prevent out-of-bounds table access on corrupted/stale config.
+
 ## v3.0.6 (2026-05-26)
 *Comprehensive bug-fixing, C code smells refactoring, and memory footprint optimizations.*
 

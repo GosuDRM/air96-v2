@@ -47,18 +47,16 @@ void Sleep_Handle(void) {
     if (f_goto_sleep) {
         f_goto_sleep = false;
 
-        if (user_config.sleep_enable || (dev_info.link_mode == LINK_USB)) {
-            if (dev_info.rf_state == RF_CONNECT) {
-                uart_send_cmd(CMD_SET_CONFIG, 5, 5);
-            } else {
-                uart_send_cmd(CMD_SLEEP, 5, 5);
-            }
-
-            // power off led
-            writePinLow(DC_BOOST_PIN);
-            writePinLow(RGB_DRIVER_SDB1);
-            writePinLow(RGB_DRIVER_SDB2);
+        if (dev_info.rf_state == RF_CONNECT) {
+            uart_send_cmd(CMD_SET_CONFIG, 5, 5);
+        } else {
+            uart_send_cmd(CMD_SLEEP, 5, 5);
         }
+
+        // power off led
+        writePinLow(DC_BOOST_PIN);
+        writePinLow(RGB_DRIVER_SDB1);
+        writePinLow(RGB_DRIVER_SDB2);
 
         f_wakeup_prepare = true;
     }
@@ -103,7 +101,7 @@ void Sleep_Handle(void) {
         }
     } else if (dev_info.rf_state == RF_CONNECT) {
         rf_disconnect_time = 0;
-        if (no_act_time >= SLEEP_TIME_DELAY) {
+        if (user_config.sleep_enable && no_act_time >= SLEEP_TIME_DELAY) {
             f_goto_sleep = true;
         }
     } else if (rf_linking_time >= LINK_TIMEOUT) {

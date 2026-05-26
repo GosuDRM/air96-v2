@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.0.6-blue.svg?style=for-the-badge" alt="Version"/></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.0.7-blue.svg?style=for-the-badge" alt="Version"/></a>
   <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-green.svg?style=for-the-badge" alt="License"/></a>
   <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
@@ -21,14 +21,14 @@ Binary output: `air96_v2_ansi_default.bin`
 
 ## ⚡ Flash
 
-📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.0.6.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.0.6/air96-v2-c-v3.0.6.bin)**
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.0.7.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.0.7/air96-v2-c-v3.0.7.bin)**
 
 Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
 
 ### 🐧 Linux
 Install `dfu-util` via your package manager (e.g. `sudo apt install dfu-util` or `sudo pacman -S dfu-util`), then run:
 ```bash
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.6.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.7.bin
 ```
 *Note: You may need `sudo` or to configure [QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules) to flash without root privileges.*
 
@@ -36,7 +36,7 @@ dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.6.bin
 Install `dfu-util` via Homebrew:
 ```bash
 brew install dfu-util
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.6.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.7.bin
 ```
 Alternatively, you can download and use the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
 
@@ -47,7 +47,7 @@ Alternatively, you can download and use the graphical [QMK Toolbox](https://gith
 4. Check the **Auto-Flash** checkbox.
 5. Hold the **Escape** key and plug in the USB cable. The flashing process will start automatically.
 
-## 🌟 Evolution & Highlights (v3.0.0 → v3.0.6)
+## 🌟 Evolution & Highlights (v3.0.0 → v3.0.7)
 
 This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable advancements achieved in the **v3.0.x** branch:
 
@@ -58,13 +58,13 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 * **🧠 Layout & UX Refinements:**
   Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
 * **🧹 Code Quality & Footprint Optimization:**
-  Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **shrinking the final binary footprint by 96 bytes** (down to 56,242 bytes).
+  Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **shrinking the final binary footprint to 56,366 bytes** (down from 56,490 bytes).
 * **📜 Full Revision History:**
   See [CHANGELOG.md](CHANGELOG.md) for the complete, human-readable record of all engineering optimizations, bug fixes, and releases.
 
 ### 📊 Performance & Optimization Summary
 
-| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.0.6) | Impact & Improvement |
+| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.0.7) | Impact & Improvement |
 | :--- | :--- | :--- | :--- |
 | **Startup Dead-Time** | `1250ms` (worst-case) | `~230ms` | **5.4× faster boot-up** & instant availability |
 | **Active Periodic UART Utilization** | `11.3%` | `0.9%` | **12.5× reduced wireless bus congestion** |
@@ -74,7 +74,7 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 | **Mac Spotlight/Screenshot Lag** | `50ms` key-chord delay | `5ms` optimized chord delay | **Eliminated sluggish OS-shortcut latency** |
 | **USB Suspend Power Draw** | Exceeded limits (up to `20mA`) | Compliant **< 2.5mA** limit | **100% Standard USB Compliance** (stops battery drain) |
 | **UART Loop Transmit** | Blocked 5–10ms per wireless cmd | **Non-blocking (0ms)** concurrent polling | **Zero boot/wakeup locks**, flawless channel switching |
-| **Binary Footprint** | `56,490` bytes | `56,242` bytes | **-248 bytes saved** via clean dynamic lookups & logic |
+| **Binary Footprint** | `56,490` bytes | `56,366` bytes | **-124 bytes saved** via clean dynamic lookups & logic |
 
 ## ✨ Features
 

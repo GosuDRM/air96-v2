@@ -322,8 +322,11 @@ static void light_point_playing(uint8_t trend, uint8_t step, uint8_t len, uint8_
         *point += step;
         if (*point >= len) *point -= len;
     } else {
-        *point -= step;
-        if (*point >= len) *point = len - (255 - *point) - 1;
+        if (*point < step) {
+            *point = len - (step - *point);
+        } else {
+            *point -= step;
+        }
     }
 }
 
@@ -642,6 +645,7 @@ static void bat_led_show(void)
     static uint8_t charge_state      = 0;
     static uint8_t bat_percent       = 0;
     static bool f_init               = 1;
+    static bool bat_full_shown       = false;
 
     if (f_init) {
         f_init        = 0;
@@ -666,9 +670,14 @@ static void bat_led_show(void)
             bat_show_flag   = false;
             bat_show_breath = false;
         }
-        if (charge_state == 0x03) {
+        if (charge_state == 0x03 && !bat_full_shown) {
             bat_show_breath = true;
             bat_show_flag   = true;
+            bat_show_time   = timer_read32();
+            bat_full_shown  = true;
+        }
+        if (charge_state != 0x03) {
+            bat_full_shown = false;
         }
     }
 

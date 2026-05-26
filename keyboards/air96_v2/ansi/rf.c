@@ -249,52 +249,56 @@ static void RF_Protocol_Receive(void) {
             case CMD_RF_STS_SYSC: {
                 static uint8_t error_cnt = 0;
 
-                if (dev_info.link_mode == Usart_Mgr.RXDBuf[4]) {
-                    error_cnt = 0;
+                if (RX_LEN >= 5) {
+                    if (dev_info.link_mode == Usart_Mgr.RXDBuf[4]) {
+                        error_cnt = 0;
 
-                    dev_info.rf_state = Usart_Mgr.RXDBuf[5];
+                        dev_info.rf_state = Usart_Mgr.RXDBuf[5];
 
-                    if ((dev_info.rf_state == RF_CONNECT) && ((Usart_Mgr.RXDBuf[6] & 0xf8) == 0)) {
-                        dev_info.rf_led = Usart_Mgr.RXDBuf[6];
-                    }
+                        if ((dev_info.rf_state == RF_CONNECT) && ((Usart_Mgr.RXDBuf[6] & 0xf8) == 0)) {
+                            dev_info.rf_led = Usart_Mgr.RXDBuf[6];
+                        }
 
-                    dev_info.rf_charge = Usart_Mgr.RXDBuf[7];
+                        dev_info.rf_charge = Usart_Mgr.RXDBuf[7];
 
-                    if (Usart_Mgr.RXDBuf[8] <= 100) {
-                        dev_info.rf_baterry = Usart_Mgr.RXDBuf[8];
-                    }
-                }
-                else {
-                    if (dev_info.rf_state != RF_INVALID) {
-                        if (error_cnt >= 5) {
-                            error_cnt      = 0;
-                            f_send_channel = true;
-                        } else {
-                            error_cnt++;
+                        if (Usart_Mgr.RXDBuf[8] <= 100) {
+                            dev_info.rf_baterry = Usart_Mgr.RXDBuf[8];
                         }
                     }
-                }
+                    else {
+                        if (dev_info.rf_state != RF_INVALID) {
+                            if (error_cnt >= 5) {
+                                error_cnt      = 0;
+                                f_send_channel = true;
+                            } else {
+                                error_cnt++;
+                            }
+                        }
+                    }
 
-                f_rf_sts_sysc_ok = true;
+                    f_rf_sts_sysc_ok = true;
+                }
                 break;
             }
 
             case CMD_READ_DATA: {
-                memcpy(func_tab, &Usart_Mgr.RXDBuf[4], 32);
+                if (RX_LEN >= FUNC_VALID_LEN) {
+                    memcpy(func_tab, &Usart_Mgr.RXDBuf[4], FUNC_VALID_LEN);
 
-                if (func_tab[4] <= LINK_USB) {
-                    dev_info.link_mode = func_tab[4];
+                    if (func_tab[4] <= LINK_USB) {
+                        dev_info.link_mode = func_tab[4];
+                    }
+
+                    if (func_tab[5] < LINK_USB) {
+                        dev_info.rf_channel = func_tab[5];
+                    }
+
+                    if ((func_tab[6] <= LINK_BT_3) && (func_tab[6] >= LINK_BT_1)) {
+                        dev_info.ble_channel = func_tab[6];
+                    }
+
+                    f_rf_read_data_ok = true;
                 }
-
-                if (func_tab[5] < LINK_USB) {
-                    dev_info.rf_channel = func_tab[5];
-                }
-
-                if ((func_tab[6] <= LINK_BT_3) && (func_tab[6] >= LINK_BT_1)) {
-                    dev_info.ble_channel = func_tab[6];
-                }
-
-                f_rf_read_data_ok = true;
                 break;
             }
             default:
