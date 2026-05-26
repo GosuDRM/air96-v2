@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="air96_v2_firmware_banner.png" alt="Air96 V2 NuPhy QMK Firmware Banner" width="800"/>
-</p>
-
-<p align="center">
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.0.6-blue.svg?style=for-the-badge" alt="Version"/></a>
   <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-green.svg?style=for-the-badge" alt="License"/></a>
