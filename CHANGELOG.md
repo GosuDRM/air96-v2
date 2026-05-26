@@ -1,6 +1,6 @@
 # Changelog
 
-## v3.0.5 — GosuDRM (2026-05-26)
+## v3.0.5 (2026-05-26)
 
 NumLock ON at boot: deferred to housekeeping_task_kb with 50-tick (~2.5s) counter delay after USB enumeration. Uses register/unregister with 50ms hold instead of tap_code for reliable host registration.
 
@@ -8,7 +8,7 @@ NumLock ON at boot: deferred to housekeeping_task_kb with 50-tick (~2.5s) counte
 
 - **NumLock auto-on** — Moved from `keyboard_post_init_kb` (too early, USB not ready) to `housekeeping_task_kb` with counter-based delay. Previous approach silently failed because host_keyboard_leds() returned 0 before USB enumeration and tap_code was lost.
 
-## v3.0.4 — GosuDRM (2026-05-26)
+## v3.0.4 (2026-05-26)
 
 Code quality: cppcheck and clang-tidy lint pass. Applied static linkage, const-correctness, and redundant-branch fixes across all Air96 source files.
 
@@ -23,7 +23,7 @@ Code quality: cppcheck and clang-tidy lint pass. Applied static linkage, const-c
 
 - **lint.yml** — CI workflow: cppcheck (blocking) + clang-tidy (advisory) on Air96 source files only
 
-## v3.0.3 — GosuDRM (2026-05-26)
+## v3.0.3 (2026-05-26)
 
 Latency optimization: eliminated ~2ms blocking in main loop, reordered housekeeping.
 
@@ -31,7 +31,7 @@ Latency optimization: eliminated ~2ms blocking in main loop, reordered housekeep
 
 - **Main Loop Blocking** — Eliminated ~2ms idle wait in `housekeeping_task()` by reordering the wireless state sync and sleep checks to run concurrently with the USB poll. Reduces minimum keystroke latency.
 
-## v3.0.2 — GosuDRM (2026-05-26)
+## v3.0.2 (2026-05-26)
 
 Wireless subsystem audit: 3 critical bugs, 2 high-severity issues, 2 medium robustness fixes, and 6 optimizations. Binary size reduced by 56 bytes.
 
@@ -68,7 +68,7 @@ Wireless subsystem audit: 3 critical bugs, 2 high-severity issues, 2 medium robu
 
 ---
 
-## v3.0.1 — GosuDRM (2026-05-26)
+## v3.0.1 (2026-05-26)
 
 Additional codebase audit, critical bug fixes, and reliability improvements.
 
@@ -82,7 +82,7 @@ Additional codebase audit, critical bug fixes, and reliability improvements.
 
 ---
 
-## v3.0.0 — GosuDRM (2025-05-25)
+## v3.0.0 (2025-05-25)
 
 Four-pass audit and optimization of the Air96 V2 QMK firmware
 (base: QMK firmware, optimized for wireless performance).

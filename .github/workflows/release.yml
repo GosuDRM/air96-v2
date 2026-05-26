@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Clone submodule dependencies
+      run: |
+        git clone --depth 1 https://github.com/qmk/ChibiOS lib/chibios
+        git clone --depth 1 https://github.com/qmk/ChibiOS-Contrib lib/chibios-contrib
+        git clone --depth 1 https://github.com/qmk/lufa lib/lufa
+        git clone --depth 1 https://github.com/qmk/v-usb lib/vusb
+        git clone --depth 1 https://github.com/qmk/printf lib/printf
+
+    - name: Install system deps
+      run: sudo apt-get update -qq && sudo apt-get install -y gcc-arm-none-eabi dfu-util
+
+    - name: Install QMK and python deps
+      run: |
+        python3 -m pip install -r requirements.txt
+        python3 -m pip install qmk
+
+    - name: Compile Air96 V2
+      run: qmk compile -kb air96_v2/ansi -km default
+
+    - name: Rename binary
+      run: mv air96_v2_ansi_default.bin air96-v2-c-${{ github.ref_name }}.bin
+
+    - name: Extract changelog
+      run: |
+        VERSION="${{ github.ref_name }}"
+        VERSION_NUM="${VERSION#v}"
+        awk -v ver="$VERSION_NUM" '
+          BEGIN { found=0 }
+          /^## v/ {
+            if (found) exit
+            if ($2 == "v"ver) found=1
+          }
+          found { print }
+        ' CHANGELOG.md > /tmp/release_notes.md
+        cat /tmp/release_notes.md
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Air96 V2 C Firmware ${{ github.ref_name }}
+        body_path: /tmp/release_notes.md
+        files: air96-v2-c-${{ github.ref_name }}.bin
