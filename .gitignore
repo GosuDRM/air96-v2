@@ -123,3 +123,4 @@ lib/
 *.hex
 *.elf
 *.map
+AGENTS.md
