@@ -53,6 +53,8 @@ bool f_rf_sw_press      = 0;
 bool f_dev_reset_press  = 0;  
 bool f_rgb_test_press   = 0;  
 bool f_bat_num_show     = 0;
+bool f_numlock_init     = 0;  /* one-shot NumLock check at boot */
+uint8_t numlock_delay   = 0;  /* ticks to wait before NumLock check */
 
 uint8_t host_mode;
 host_driver_t *m_host_driver   = 0;
@@ -680,10 +682,8 @@ void keyboard_post_init_kb(void)
     m_host_driver = host_get_driver();
     m_power_on_dial_sw_scan();
     f_dial_sw_init_ok = 1;  /* allow reports immediately after init */
-    wait_ms(500);
-    if (!(host_keyboard_leds() & 0x01)) {
-        tap_code(KC_NUM_LOCK);  /* ensure NumLock ON at boot */
-    }
+    f_numlock_init  = 1;  /* trigger NumLock check in housekeeping */
+    numlock_delay   = 50; /* ~2.5s delay for USB enumeration */
 }
 
 /**
@@ -722,4 +722,19 @@ void housekeeping_task_kb(void)
     dev_sts_sync();
 
     m_side_led_show();
+
+    /* One-shot NumLock ON at boot — deferred until USB enumerates.
+       Counter-based delay avoids racing USB setup on first tick. */
+    if (f_numlock_init) {
+        if (numlock_delay > 0) {
+            numlock_delay--;
+        } else {
+            f_numlock_init = 0;
+            if (!(host_keyboard_leds() & 0x01)) {
+                register_code(KC_NUM_LOCK);
+                wait_ms(50);
+                unregister_code(KC_NUM_LOCK);
+            }
+        }
+    }
 }

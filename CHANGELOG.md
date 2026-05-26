@@ -2,11 +2,11 @@
 
 ## v3.0.5 — GosuDRM (2026-05-26)
 
-NumLock ON at boot: host_keyboard_leds() poll + conditional tap_code(KC_NUM_LOCK) after 500ms post-init delay. Works across Windows, Linux, macOS regardless of previous state.
+NumLock ON at boot: deferred to housekeeping_task_kb with 50-tick (~2.5s) counter delay after USB enumeration. Uses register/unregister with 50ms hold instead of tap_code for reliable host registration.
 
-### Added
+### Fixed
 
-- **NumLock auto-on at boot** — Checks HID LED state in `keyboard_post_init_kb()` after 500ms USB settle delay. Only taps NumLock if currently off, avoiding double-toggle.
+- **NumLock auto-on** — Moved from `keyboard_post_init_kb` (too early, USB not ready) to `housekeeping_task_kb` with counter-based delay. Previous approach silently failed because host_keyboard_leds() returned 0 before USB enumeration and tap_code was lost.
 
 ## v3.0.4 — GosuDRM (2026-05-26)
 
