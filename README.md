@@ -21,12 +21,14 @@ Binary output: `air96_v2_ansi_default.bin`
 
 ## ⚡ Flash
 
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.0.6.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.0.6/air96-v2-c-v3.0.6.bin)**
+
 Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
 
 ### 🐧 Linux
 Install `dfu-util` via your package manager (e.g. `sudo apt install dfu-util` or `sudo pacman -S dfu-util`), then run:
 ```bash
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96_v2_ansi_default.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.6.bin
 ```
 *Note: You may need `sudo` or to configure [QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules) to flash without root privileges.*
 
@@ -34,7 +36,7 @@ dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96_v2_ansi_default.bin
 Install `dfu-util` via Homebrew:
 ```bash
 brew install dfu-util
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96_v2_ansi_default.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.6.bin
 ```
 Alternatively, you can download and use the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
 
@@ -57,8 +59,8 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
   Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
 * **🧹 Code Quality & Footprint Optimization:**
   Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **shrinking the final binary footprint by 96 bytes** (down to 56,242 bytes).
-* **🛡️ IDE Integration:**
-  Included `<stdint.h>` in `side.h` to fully resolve custom array types, eliminating undefined type errors in standard language parsers.
+* **📜 Full Revision History:**
+  See [CHANGELOG.md](CHANGELOG.md) for the complete, human-readable record of all engineering optimizations, bug fixes, and releases.
 
 ### 📊 Performance & Optimization Summary
 
@@ -67,7 +69,7 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 | **Startup Dead-Time** | `1250ms` (worst-case) | `~230ms` | **5.4× faster boot-up** & instant availability |
 | **Active Periodic UART Utilization** | `11.3%` | `0.9%` | **12.5× reduced wireless bus congestion** |
 | **Per-Report UART Payload Time** | `2.35ms` (brute 3× repeats) | `0.72ms` (reliable 1× transmit) | **3.26× faster keystroke packet dispatch** |
-| **Keystroke Transmission Latency** | `~4.0ms` | `~1.8ms` | **Ultra-low latency** key-press registration |
+| **Keystroke Transmission Latency** | `~4.0ms` | `~1ms` | **Ultra-low latency** key-press registration |
 | **Deep-Sleep First-Key Wakeup** | Keystroke lost + `75ms` delay | **Keystroke preserved** + `2.7ms` wakeup | **No missed keystrokes** after idle/sleep |
 | **Mac Spotlight/Screenshot Lag** | `50ms` key-chord delay | `5ms` optimized chord delay | **Eliminated sluggish OS-shortcut latency** |
 | **USB Suspend Power Draw** | Exceeded limits (up to `20mA`) | Compliant **< 2.5mA** limit | **100% Standard USB Compliance** (stops battery drain) |

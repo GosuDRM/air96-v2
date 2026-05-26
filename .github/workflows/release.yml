@@ -36,14 +36,25 @@ jobs:
     - name: Rename binary
       run: mv air96_v2_ansi_default.bin air96-v2-c-${{ github.ref_name }}.bin
 
+    - name: Update README with dynamic release link
+      run: |
+        VERSION="${{ github.ref_name }}"
+        sed -i -E "s\|air96-v2-c-v[0-9.]+\.bin\|air96-v2-c-${VERSION}.bin\|g" README.md
+        sed -i -E "s\|air96-v2-c-v[0-9.]+\.bin\|air96-v2-c-${VERSION}.bin\|g" keyboards/air96_v2/ansi/readme.md
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add README.md keyboards/air96_v2/ansi/readme.md
+        git commit -m "docs: dynamically update pre-compiled firmware links to ${VERSION} [skip ci]" || echo "No changes to commit"
+        git push origin HEAD:master
+
+
     - name: Extract changelog
       run: |
         VERSION="${{ github.ref_name }}"
-        VERSION_NUM="${VERSION#v}"
-        awk -v ver="$VERSION_NUM" '
-          /^## v3\.0\.0/ { found=1 }
+        awk -v ver="$VERSION" '
+          $0 ~ "^## " ver { found=1; print; next }
+          /^## v/ { found=0 }
           found { print }
-          $0 ~ "^## v" ver " " { if (found && $2 != "v3.0.0") exit }
         ' CHANGELOG.md > /tmp/release_notes.md
         cat /tmp/release_notes.md
 
