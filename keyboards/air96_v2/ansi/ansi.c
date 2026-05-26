@@ -32,7 +32,7 @@ DEV_INFO_STRUCT dev_info =
     .rf_state   = RF_IDLE,
 };
 
-bool f_uart_ack         = 0; 
+volatile bool f_uart_ack         = 0; 
 bool f_bat_show         = 0;  
 bool f_bat_hold         = 0;  
 bool f_dev_sleep_enable = 1; 
@@ -40,15 +40,15 @@ bool f_chg_show         = 1;
 bool f_sys_show         = 0; 
 bool f_sleep_show       = 0; 
 bool f_func_save        = 0;  
-bool f_rf_read_data_ok  = 0;  
-bool f_rf_sts_sysc_ok   = 0; 
-bool f_rf_new_adv_ok    = 0;  
-bool f_rf_reset         = 0;  
-bool f_send_channel     = 0;  
-bool f_rf_hand_ok       = 0;  
+volatile bool f_rf_read_data_ok  = 0;  
+volatile bool f_rf_sts_sysc_ok   = 0; 
+volatile bool f_rf_new_adv_ok    = 0;  
+volatile bool f_rf_reset         = 0;  
+volatile bool f_send_channel     = 0;  
+volatile bool f_rf_hand_ok       = 0;  
 bool f_dial_sw_init_ok  = 0;  
-bool f_goto_sleep       = 0; 
-bool f_wakeup_prepare   = 0; 
+volatile bool f_goto_sleep       = 0; 
+volatile bool f_wakeup_prepare   = 0; 
 bool f_rf_sw_press      = 0;  
 bool f_dev_reset_press  = 0;  
 bool f_rgb_test_press   = 0;  
@@ -234,6 +234,10 @@ void m_break_all_key(void)
     memset(uart_bit_report_buf, 0, sizeof(uart_bit_report_buf));
     memset(bitkb_report_buf, 0, sizeof(bitkb_report_buf));
     memset(bytekb_report_buf, 0, sizeof(bytekb_report_buf));
+
+    /* Clear NKRO active flag to stop periodic resends of stale bit reports */
+    extern bool f_bit_kb_act;
+    f_bit_kb_act = 0;
 }
 
 /**

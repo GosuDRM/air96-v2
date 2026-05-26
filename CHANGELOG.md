@@ -1,5 +1,42 @@
 # Changelog
 
+## v3.0.2 — GosuDRM (2026-05-26)
+
+Wireless subsystem audit: 3 critical bugs, 2 high-severity issues, 2 medium robustness fixes, and 6 optimizations. Binary size reduced by 56 bytes.
+
+### Critical Bug Fixes
+
+- **Sleep/wake race condition** — `uart_send_report()` cleared `f_wakeup_prepare` before `Sleep_Handle()` could act on it, preventing USB wakeup signaling. First keypress after USB suspend would light up LEDs but never wake the PC. Fixed by letting `Sleep_Handle()` own the full wake sequence. (rf.c)
+- **RX buffer overread** — `RF_Protocol_Receive()` had no bounds check on `RX_LEN` (received from RF module). A malformed packet with large `RX_LEN` could read past `RXDBuf[64]`. Added `RX_LEN > UART_MAX_LEN - 5` guard. (rf.c)
+- **Redundant checksum writes** — `CMD_SET_NAME` and `CMD_SET_24G_NAME` computed checksums inside their switch-cases that were then overwritten by the generic checksum at line 441. Removed the dead in-case writes. (rf.c)
+
+### High Severity Fixes
+
+- **NRF reset loop** — `sync_lost` threshold of 5 (1 second) with 200ms blocking reset delays could trap the NRF in an infinite reset cycle. Increased threshold to 10 (2 seconds) and added 600ms post-reset cooldown to let the NRF boot. (rf.c)
+- **Stale NKRO after channel switch** — `f_bit_kb_act` was never cleared by `m_break_all_key()`, causing periodic resends of potentially stale bit reports after mode/channel switching. (ansi.c)
+
+### Medium Fixes
+
+- **RX timeout recovery** — `uart_receive_pro()` could hang indefinitely on partial packets from UART noise. Added 10ms timeout that discards partial packets and resets the parser. Uses the previously-unused `RXDOverTime` concept. (rf.c)
+- **Idle resend window** — Reduced from ~20 seconds (`no_act_time <= 2000`) to ~2 seconds (`<= 200`). Eliminates ~100 redundant zero-key reports after the last keypress. (rf.c)
+
+### Optimizations
+
+- **Removed dead triple-send** — `uart_repeat_flag` and its 3× retry loop in `UART_Send_Bytes` were never triggered (always set to 0 before send). Removed entirely, simplifying the transmit path. (rf.c)
+- **USB-mode sync rate** — `CMD_RF_STS_SYSC` was sent 5×/sec even in USB mode (waking the NRF unnecessarily). Now uses a prescaler: 1×/2sec in USB mode, 5×/sec in RF mode. Saves ~2-3mA on battery. (rf.c)
+- **Report buffer sizing** — `uart_bit_report_buf` and `bitkb_report_buf` reduced from `[32]` to `[NKRO_REPORT_BITS + 1]` (16 bytes each). Saves 32 bytes of RAM. (rf.c)
+- **Volatile qualifiers** — Added `volatile` to 8 flags shared between main loop and UART polling paths (`f_uart_ack`, `f_rf_hand_ok`, `f_rf_read_data_ok`, `f_rf_sts_sysc_ok`, `f_rf_new_adv_ok`, `f_rf_reset`, `f_send_channel`, `f_goto_sleep`, `f_wakeup_prepare`). Prevents compiler from hoisting flag checks out of polling loops. (ansi.c, rf.c, sleep.c)
+- **Resend interval** — Periodic report resend reduced from 200ms to 100ms for improved wireless responsiveness during fast typing. (rf.c)
+- **2.4G name encoding** — Replaced 21 individual `TXDBuf` assignments with a `static const uint8_t[]` UTF-16LE array and `memcpy`. Eliminates fragile dependency on `memset` zeroing interleaved bytes. (rf.c)
+
+### Size
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Binary | 56490 bytes | 56434 bytes (−56) |
+
+---
+
 ## v3.0.1 — GosuDRM (2026-05-26)
 
 Additional codebase audit, critical bug fixes, and reliability improvements.

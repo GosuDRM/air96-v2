@@ -11,24 +11,23 @@ USART_MGR_STRUCT Usart_Mgr;
 #define RX_LEN      Usart_Mgr.RXDBuf[3]
 #define RX_DAT      Usart_Mgr.RXDBuf[4]
 
-extern bool f_uart_ack;
-extern bool f_rf_read_data_ok;
-extern bool f_rf_sts_sysc_ok;
-extern bool f_rf_new_adv_ok;
-extern bool f_rf_reset;
-extern bool f_rf_hand_ok;
-extern bool f_goto_sleep;
-extern bool f_wakeup_prepare;
+extern volatile bool f_uart_ack;
+extern volatile bool f_rf_read_data_ok;
+extern volatile bool f_rf_sts_sysc_ok;
+extern volatile bool f_rf_new_adv_ok;
+extern volatile bool f_rf_reset;
+extern volatile bool f_rf_hand_ok;
+extern volatile bool f_goto_sleep;
+extern volatile bool f_wakeup_prepare;
 
-uint8_t  uart_bit_report_buf[32] = {0};
-uint8_t  func_tab[32]            = {0};
-uint8_t  bitkb_report_buf[32]    = {0};
+uint8_t  uart_bit_report_buf[NKRO_REPORT_BITS + 1] = {0};
+uint8_t  func_tab[32]                              = {0};
+uint8_t  bitkb_report_buf[NKRO_REPORT_BITS + 1]    = {0};
 uint8_t  bytekb_report_buf[8]    = {0};
 uint16_t conkb_report            = 0;
 uint16_t syskb_report            = 0;
 uint8_t  sync_lost               = 0;
 uint8_t  disconnect_delay        = 0;
-bool     uart_repeat_flag        = 0;
 
 extern DEV_INFO_STRUCT dev_info;
 extern host_driver_t  *m_host_driver;
@@ -127,9 +126,9 @@ void uart_send_report_func(void)
     if (dev_info.link_mode == LINK_USB) return;
     keyboard_protocol          = 1;
 
-    if (timer_elapsed32(interval_timer) > 200) {
+    if (timer_elapsed32(interval_timer) > 100) {
         interval_timer = timer_read32();
-        if (no_act_time <= 2000) {
+        if (no_act_time <= 200) {
             uart_send_report(CMD_RPT_BYTE_KB, bytekb_report_buf, 8);
             wait_us(200);
 
@@ -203,6 +202,13 @@ void RF_Protocol_Receive(void) {
         if (Usart_Mgr.RXDLen > 4) {
             if((Usart_Mgr.RXDLen - 5) != RX_LEN) 
                 return;
+
+            /* Bounds check: RX_LEN comes from the RF module; reject if it
+               would cause us to read past the end of RXDBuf. */
+            if (RX_LEN > UART_MAX_LEN - 5) {
+                Usart_Mgr.RXDState = RX_DATA_OV;
+                return;
+            }
 
             for (i = 0; i < RX_LEN; i++)
                 check_sum += Usart_Mgr.RXDBuf[4 + i];
@@ -385,36 +391,23 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
             Usart_Mgr.TXDBuf[18] = 'V';
             Usart_Mgr.TXDBuf[19] = '2';
             Usart_Mgr.TXDBuf[20] = '-';
-            Usart_Mgr.TXDBuf[21] = get_checksum(Usart_Mgr.TXDBuf + 4, Usart_Mgr.TXDBuf[3]);
+            /* Checksum computed by generic write after the switch */
             break;
         }
 
         case CMD_SET_24G_NAME: {
-            Usart_Mgr.TXDBuf[3]  = 44;  // uart data len
-            Usart_Mgr.TXDBuf[4]  = 44;  // name valid len
-            Usart_Mgr.TXDBuf[5]  = 3;   // 固定
-            Usart_Mgr.TXDBuf[6]  = 'N';
-            Usart_Mgr.TXDBuf[8]  = 'u';
-            Usart_Mgr.TXDBuf[10] = 'P';
-            Usart_Mgr.TXDBuf[12] = 'h';
-            Usart_Mgr.TXDBuf[14] = 'y';
-            Usart_Mgr.TXDBuf[16] = ' ';
-            Usart_Mgr.TXDBuf[18] = 'A';
-            Usart_Mgr.TXDBuf[20] = 'i';
-            Usart_Mgr.TXDBuf[22] = 'r';
-            Usart_Mgr.TXDBuf[24] = '9';
-            Usart_Mgr.TXDBuf[26] = '6';
-            Usart_Mgr.TXDBuf[28] = ' ';
-            Usart_Mgr.TXDBuf[30] = 'V';
-            Usart_Mgr.TXDBuf[32] = '2';
-            Usart_Mgr.TXDBuf[34] = ' ';
-            Usart_Mgr.TXDBuf[36] = 'D';
-            Usart_Mgr.TXDBuf[38] = 'o';
-            Usart_Mgr.TXDBuf[40] = 'n';
-            Usart_Mgr.TXDBuf[42] = 'g';
-            Usart_Mgr.TXDBuf[44] = 'l';
-            Usart_Mgr.TXDBuf[46] = 'e';
-            Usart_Mgr.TXDBuf[48] = get_checksum(Usart_Mgr.TXDBuf + 4, Usart_Mgr.TXDBuf[3]);  // sum
+            /* UTF-16LE encoded name for 2.4G dongle */
+            static const uint8_t name_24g[] = {
+                'N', 0, 'u', 0, 'P', 0, 'h', 0, 'y', 0, ' ', 0,
+                'A', 0, 'i', 0, 'r', 0, '9', 0, '6', 0, ' ', 0,
+                'V', 0, '2', 0, ' ', 0, 'D', 0, 'o', 0, 'n', 0,
+                'g', 0, 'l', 0, 'e', 0
+            };
+            Usart_Mgr.TXDBuf[3] = 44;  // uart data len
+            Usart_Mgr.TXDBuf[4] = 44;  // name valid len
+            Usart_Mgr.TXDBuf[5] = 3;   // fixed field
+            memcpy(&Usart_Mgr.TXDBuf[6], name_24g, sizeof(name_24g));
+            /* Checksum computed by generic write after the switch */
             break;
         }
 
@@ -457,13 +450,20 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
  * @brief RF module state sync.
  */
 void dev_sts_sync(void) {
-    static uint32_t interval_timer  = 0;
-    static uint8_t  link_state_temp = RF_DISCONNECT;
+    static uint32_t interval_timer      = 0;
+    static uint8_t  link_state_temp     = RF_DISCONNECT;
+    static uint8_t  reset_cooldown      = 0;
+    static uint8_t  usb_sync_prescaler  = 0;
 
     if (timer_elapsed32(interval_timer) < 200)
         return;
     else
         interval_timer = timer_read32();
+
+    /* Post-reset cooldown: skip sync_lost counting to give NRF time to boot */
+    if (reset_cooldown > 0) {
+        reset_cooldown--;
+    }
 
     if (f_rf_reset) {
         f_rf_reset = 0;
@@ -472,6 +472,7 @@ void dev_sts_sync(void) {
         wait_ms(50);
         writePinHigh(NRF_RESET_PIN);
         wait_ms(50);
+        reset_cooldown = 3;  /* ~600ms cooldown (3 × 200ms intervals) */
     }
     else if (f_send_channel) {
         f_send_channel = 0;
@@ -513,17 +514,26 @@ void dev_sts_sync(void) {
                 link_state_temp   = RF_CONNECT;
                 rf_link_show_time = 0;
                 if (dev_info.link_mode == LINK_RF_24) {
-                    // 连接后设置一次2.4G名称
                     uart_send_cmd(CMD_SET_24G_NAME, 10, 5);
                 }
             }
         }
     }
 
-    uart_send_cmd(CMD_RF_STS_SYSC, 1, 1);
+    /* In USB mode, only sync every ~2 seconds (10 × 200ms) for battery info.
+       In RF mode, sync every 200ms for connection state. */
+    if (dev_info.link_mode == LINK_USB) {
+        if (++usb_sync_prescaler >= 10) {
+            usb_sync_prescaler = 0;
+            uart_send_cmd(CMD_RF_STS_SYSC, 1, 1);
+        }
+    } else {
+        usb_sync_prescaler = 0;
+        uart_send_cmd(CMD_RF_STS_SYSC, 1, 1);
+    }
 
-    if (dev_info.link_mode != LINK_USB) {
-        if (++sync_lost >= 5) {
+    if (dev_info.link_mode != LINK_USB && reset_cooldown == 0) {
+        if (++sync_lost >= 10) {
             sync_lost  = 0;
             f_rf_reset = 1;
         }
@@ -536,28 +546,13 @@ void dev_sts_sync(void) {
  * @param Length data length
  */
 void UART_Send_Bytes(uint8_t *Buffer, uint32_t Length) {
-    if(uart_repeat_flag) {
-        for(uint8_t i = 0;i<3;i++)
-        {
-            writePinLow(NRF_WAKEUP_PIN);
-            wait_us(50);
-        
-            uart_transmit(Buffer, Length);
-        
-            wait_us(50 + Length * 32);
-            writePinHigh(NRF_WAKEUP_PIN);  
-        
-            wait_us(200);      
-        }        
-    } else {
-            writePinLow(NRF_WAKEUP_PIN);
-            wait_us(50);
-        
-            uart_transmit(Buffer, Length);
-        
-            wait_us(50 + Length * 32);
-            writePinHigh(NRF_WAKEUP_PIN);          
-    }
+    writePinLow(NRF_WAKEUP_PIN);
+    wait_us(50);
+
+    uart_transmit(Buffer, Length);
+
+    wait_us(50 + Length * 32);
+    writePinHigh(NRF_WAKEUP_PIN);
 }
 
 /**
@@ -589,9 +584,10 @@ void uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_s
     /* Let RF module handle its own state -- don't drop reports during pairing/linking. */
 
     /* If waking from sleep, power up RF module before sending the first report.
-       Avoids the race where the report hits the UART before Sleep_Handle wakes the NRF. */
+       Avoids the race where the report hits the UART before Sleep_Handle wakes the NRF.
+       Note: we do NOT clear f_wakeup_prepare here — Sleep_Handle() owns the full
+       wake sequence including USB wakeup signaling (fix for C3 race condition). */
     if (f_wakeup_prepare) {
-        f_wakeup_prepare = 0;
         writePinHigh(DC_BOOST_PIN);
         writePinHigh(RGB_DRIVER_SDB1);
         writePinHigh(RGB_DRIVER_SDB2);
@@ -606,8 +602,6 @@ void uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_s
     memcpy(&Usart_Mgr.TXDBuf[4], report_buf, report_size);
     Usart_Mgr.TXDBuf[4 + report_size] = get_checksum(&Usart_Mgr.TXDBuf[4], report_size);
 
-    uart_repeat_flag = 0;  /* single transmission -- parity provides sufficient reliability */
-
     UART_Send_Bytes(&Usart_Mgr.TXDBuf[0], report_size + 5);
 }
 
@@ -615,7 +609,21 @@ void uart_send_report(uint8_t report_type, uint8_t *report_buf, uint8_t report_s
  * @brief Uart receives data and processes it after completion,.
  */
 void uart_receive_pro(void) {
+    static uint32_t rx_timeout_timer = 0;
+
+    /* Timeout recovery: if we started receiving a packet but no new bytes
+       arrive within 10ms, discard the partial packet and reset the parser.
+       Prevents the parser from hanging on UART noise. */
+    if (Usart_Mgr.RXDLen > 0 && !uart_available()) {
+        if (timer_elapsed32(rx_timeout_timer) > 10) {
+            Usart_Mgr.RXDLen   = 0;
+            Usart_Mgr.RXDState = RX_Idle;
+        }
+        return;
+    }
+
     while (uart_available()) {
+        rx_timeout_timer = timer_read32();
         uint8_t b = uart_read();
 
         if (Usart_Mgr.RXDLen == 0) {
@@ -685,7 +693,7 @@ void rf_uart_init(void) {
 /**
  * @brief Send a command and poll for response. Returns true if ok_flag was set.
  */
-static bool rf_init_try_cmd(uint8_t cmd, bool *ok_flag) {
+static bool rf_init_try_cmd(uint8_t cmd, volatile bool *ok_flag) {
     uint8_t timeout = 10;
     *ok_flag = 0;
     while (timeout--) {
