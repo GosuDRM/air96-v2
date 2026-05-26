@@ -1,28 +1,38 @@
-# ⌨️ Air96 V2
+<p align="center">
+  <img src="../../../air96_v2_firmware_banner.png" alt="Air96 V2 NuPhy QMK Firmware Banner" width="800"/>
+</p>
 
-Optimized QMK firmware for the Air96 V2 wireless mechanical keyboard.
+<p align="center">
+  <img src="https://img.shields.io/badge/keyboard-NuPhy%20Air96%20V2-brightgreen.svg?style=for-the-badge" alt="Keyboard"/>
+  <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
+  <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
+</p>
+
+# ⌨️ Air96 V2 Keyboard Port
+
+Optimized high-performance QMK firmware port for the Air96 V2 wireless mechanical keyboard.
 
 ## 🚀 What's Changed
 
-This firmware has been extensively audited and optimized:
+This firmware has been extensively audited, bug-fixed, and performance-hardened compared to the stock version:
 
-- **Bug fixes** — infinite disconnect blink, missing UART checksums, battery data loss, dead code
-- **Wireless latency & execution** — startup time 1.25s → 0.23s, reports no longer dropped during pairing, periodic UART congestion reduced 12×, **wait_ack loop latency blockade resolved (rf.c)**
-- **Stroke latency** — first-key-after-sleep: lost keystroke + 75ms → 2.7ms preserved, per-report UART time 2.35ms → 0.72ms
-- **Power compliance** — forced LED and NRF shutdown during USB suspend in `sleep.c` to fully satisfy USB low-power suspend spec (0.5mA / 2.5mA max)
-- **Code smells & static quality** — resolved all brace omissions, static linkages, implicit bool conversions, re-scoped variables dynamically, and removed unreachable/dead structures (ansi.c, rf.c, side.c, sleep.c)
-- **Memory footprint optimized** — dynamic loop refactoring and array lookup for battery LEDs reduced binary size by **96 bytes** (down to 56,242 bytes)
+- **⚡ Zero-Latency Wake & Command Hardening** — Solved a critical wait-for-ACK loop blocking issue in `rf.c`, restoring immediate, non-blocking serial parsing. Wireless startup dead-time has been slashed **5.4×** (1250ms → 230ms), and inline wakeup logic ensures that the first keystroke after deep sleep is preserved and registered within `2.7ms` (previously lost + 75ms).
+- **🔋 Power Consumption & USB Compliance** — Prescaled state synchronization checks in wired mode to save 2-3mA on battery. The sleep handler has been hardened to force LED and NRF power-downs during USB suspend even when auto-sleep is disabled, fully satisfying the USB suspend current draw limits (0.5mA / 2.5mA max).
+- **🧠 Layout & UX Refinements** — Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
+- **🧹 Code Quality & Footprint Optimization** — Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **shrinking the final binary footprint by 96 bytes** (down to 56,242 bytes).
+- **🛡️ IDE Integration** — Included `<stdint.h>` in `side.h` to fully resolve custom array types, eliminating undefined type errors in standard language parsers.
 
-See [CHANGELOG.md](../../../CHANGELOG.md) for the full list of changes.
+See [CHANGELOG.md](../../../CHANGELOG.md) for the full history of revisions.
 
 ## 🛠️ Build
 
+Requires QMK CLI and `arm-none-eabi-gcc` toolchain.
+
 ```bash
-# Requires QMK CLI and arm-none-eabi-gcc (Arch/CachyOS: pacman -S qmk arm-none-eabi-gcc)
 qmk compile -kb air96_v2/ansi -km default
 ```
 
-Or with make:
+Or build with standard GNU Make:
 
 ```bash
 make air96_v2/ansi:default
@@ -30,19 +40,25 @@ make air96_v2/ansi:default
 
 ## ⚡ Flash
 
-Enter bootloader by holding Escape while plugging in, then:
-
+1. Disconnect the keyboard's USB cable.
+2. Hold down the **Escape** key while plugging in the USB cable to enter DFU bootloader mode.
+3. Execute the flash command:
 ```bash
 make air96_v2/ansi:default:flash
 ```
 
 ## 🎛️ VIA Support
 
+To compile the firmware with VIA layout editing support, use the `via` keymap:
+
 ```bash
 make air96_v2/ansi:via
 ```
 
-## 🏷️ Version
+## 🏷️ Version Specs
 
-**v3.0.6** — GosuDRM
-STM32F072 · IS31FL3733 RGB driver · 460800 baud UART to NRF wireless module
+- **Version:** `v3.0.6` — GosuDRM
+- **Controller:** STM32F072
+- **RGB Matrix Driver:** Dual IS31FL3733 (110 individual RGB LEDs)
+- **Wireless Interface:** 460800 baud hardware UART interface to NRF52832 module
+
