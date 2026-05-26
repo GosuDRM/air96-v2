@@ -1,6 +1,6 @@
 {
     "keyboard_name": "Air96 V2",
-    "manufacturer": "GosuDRM",
+    "manufacturer": "NuPhy",
     "usb":{
         "vid": "0x19F5",
         "pid": "0x3266",
