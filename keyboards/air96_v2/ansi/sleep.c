@@ -30,13 +30,15 @@ extern uint16_t             no_act_time;
 
 uint8_t uart_send_cmd(uint8_t cmd, uint8_t ack_cnt, uint8_t delayms);
 
+uint32_t rf_disconnect_time = 0;
+
 /**
  * @brief  Sleep Handle.
  */
 void Sleep_Handle(void) {
     static uint32_t delay_step_timer = 0;
     static uint8_t  usb_suspend_debounce;
-    static uint32_t rf_disconnect_time = 0;
+    static uint8_t  wakeup_timeout = 0;
 
     /* 50ms interval */
     if (timer_elapsed32(delay_step_timer) < 50) {
@@ -45,6 +47,12 @@ void Sleep_Handle(void) {
     delay_step_timer = timer_read32();
 
     if (f_goto_sleep) {
+        /* Guard: reject NRF sleep request when USB is active and not suspended */
+        if (dev_info.link_mode == LINK_USB && USB_DRIVER.state != USB_SUSPENDED) {
+            f_goto_sleep = false;
+            return;
+        }
+
         f_goto_sleep = false;
 
         if (dev_info.rf_state == RF_CONNECT) {
@@ -61,27 +69,36 @@ void Sleep_Handle(void) {
         f_wakeup_prepare = true;
     }
 
-    if (f_wakeup_prepare && (no_act_time < 10)) {
+    if (f_wakeup_prepare) {
+        wakeup_timeout++;
+        if (no_act_time >= 10 && wakeup_timeout < 10) {
+            return;
+        }
+        wakeup_timeout = 0;
         f_wakeup_prepare = false;
+        usb_suspend_debounce = 0;
+        rf_disconnect_time = 0;
 
         writePinHigh(DC_BOOST_PIN);
         writePinHigh(RGB_DRIVER_SDB1);
         writePinHigh(RGB_DRIVER_SDB2);
 
         uart_send_cmd(CMD_HAND, 0, 1);
+        {
+            extern void m_break_all_key(void);
+            m_break_all_key();
+        }
 
         if (dev_info.link_mode == LINK_USB) {
             if ((USB_DRIVER.status & USB_GETSTATUS_REMOTE_WAKEUP_ENABLED)) {
                 usb_lld_wakeup_host(&USB_DRIVER);
                 wait_ms(50);
-                uint8_t timeout = 10;
+                uint8_t timeout = 5;
                 while ((USB_DRIVER.state == USB_SUSPENDED) && (timeout--)) {
                     usbWakeupHost(&USB_DRIVER);
                     restart_usb_driver(&USB_DRIVER);
                     wait_ms(50);
                 }
-                extern void m_break_all_key(void);
-                m_break_all_key();
             }
         }
     }
