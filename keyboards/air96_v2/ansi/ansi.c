@@ -98,6 +98,8 @@ extern void side_colour_control(uint8_t dir);
 extern void side_mode_control(uint8_t dir);
 extern void num_led_show(void);
 
+extern uint32_t rf_disconnect_time;
+
 
 
 
@@ -145,7 +147,7 @@ static void long_press_key(void)
             dev_info.rf_channel  = rf_sw_temp;
             dev_info.ble_channel = rf_sw_temp;
 
-            uint8_t timeout = 5;
+            uint8_t timeout = 3;
             while (timeout--) {
                 uart_send_cmd(CMD_NEW_ADV, 0, 1);
                 wait_ms(20);
@@ -256,6 +258,10 @@ static void switch_dev_link(uint8_t mode)
 
     dev_info.link_mode = mode; 
     dev_info.rf_state = RF_IDLE;
+    rf_linking_time = 0;
+    no_act_time = 0;
+    rf_disconnect_time = 0;
+    rf_reset_sync_lost();
     f_send_channel = 1;
 
     if (mode == LINK_USB) {
@@ -433,8 +439,10 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             if (record->event.pressed) {
                 m_break_all_key();
             } else {
-                dev_info.link_mode = LINK_USB;
-                uart_send_cmd(CMD_SET_LINK, 10, 5);
+                if (dev_info.link_mode != LINK_USB) {
+                    dev_info.link_mode = LINK_USB;
+                    uart_send_cmd(CMD_SET_LINK, 10, 5);
+                }
                 rf_blink_cnt = 3;
             }
             return false;
