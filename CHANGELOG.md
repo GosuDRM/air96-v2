@@ -2,6 +2,22 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.0 (2026-05-31)
+*Stability overhaul — sleep/wake, mode switching, LED, and protocol fixes.*
+
+- **Fixed double keypresses**: Raised key debounce from 1ms to 5ms — the old value was too short for mechanical switch bounce, causing phantom repeat inputs on fast taps.
+- **Right-side LEDs stay rainbow in wired mode**: Battery indicator (orange breathing) now only activates in wireless/battery mode. Wired USB mode always shows the selected RGB animation.
+- **No more half-asleep lockup**: Wireless sleep requests are now rejected when USB is active. Added a 500ms wakeup timeout fallback so the keyboard can't get stuck in a half-asleep state.
+- **Cleaner wake from sleep**: All held keys are cleared on wake (not just USB mode), preventing stale keypresses. USB suspend debounce and disconnect timers reset properly after wakeup.
+- **Faster USB wakeup**: Reduced host wakeup retry loop from 500ms to 250ms max.
+- **Safer mode switching**: Switching between USB/BT/RF now resets all sync counters, link timers, and disconnect state. The USB mode key no longer sends redundant commands when already in USB mode.
+- **NRF sync reliability**: Short 3-byte ACKs from the wireless module now properly clear the sync-lost counter, preventing unnecessary NRF resets.
+- **Buffer overflow guards**: Added bounds checks on UART send functions as defense-in-depth.
+- **Volatile correctness**: Fixed extern declarations that were missing volatile qualifiers, preventing potential issues with link-time optimization.
+- **Battery indicator auto-dismiss**: The manual battery percent display (BAT_SHOW key) now auto-clears after 10 seconds instead of staying on forever.
+- **Smoother colour cycling**: Fixed the side LED colour control wrapping past index 0 and skipping colours.
+- **Reduced blocking**: Bluetooth pairing command retries reduced from 100ms to 60ms, and USB mode key no longer blocks when already in USB mode.
+
 ## v3.0.8 (2026-05-26)
 *Wired latency, host driver fixes, and RF init timeouts.*
 
