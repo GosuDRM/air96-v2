@@ -21,14 +21,14 @@ Binary output: `air96_v2_ansi_default.bin`
 
 ## ⚡ Flash
 
-📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.0.8.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.0.8/air96-v2-c-v3.0.8.bin)**
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.0.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.0.8/air96-v2-c-v3.2.0.bin)**
 
 Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
 
 ### 🐧 Linux
 Install `dfu-util` via your package manager (e.g. `sudo apt install dfu-util` or `sudo pacman -S dfu-util`), then run:
 ```bash
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.8.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.0.bin
 ```
 *Note: You may need `sudo` or to configure [QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules) to flash without root privileges.*
 
@@ -36,7 +36,7 @@ dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.8.bin
 Install `dfu-util` via Homebrew:
 ```bash
 brew install dfu-util
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.0.8.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.0.bin
 ```
 Alternatively, you can download and use the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
 
