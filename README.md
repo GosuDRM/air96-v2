@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.0.8-blue.svg?style=for-the-badge" alt="Version"/></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.2.0-blue.svg?style=for-the-badge" alt="Version"/></a>
   <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-green.svg?style=for-the-badge" alt="License"/></a>
   <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
@@ -21,7 +21,7 @@ Binary output: `air96_v2_ansi_default.bin`
 
 ## ⚡ Flash
 
-📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.0.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.0.8/air96-v2-c-v3.2.0.bin)**
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.0.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.0/air96-v2-c-v3.2.0.bin)**
 
 Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
 
@@ -47,10 +47,12 @@ Alternatively, you can download and use the graphical [QMK Toolbox](https://gith
 4. Check the **Auto-Flash** checkbox.
 5. Hold the **Escape** key and plug in the USB cable. The flashing process will start automatically.
 
-## 🌟 Highlights (v3.0.0 → v3.0.8)
+## 🌟 Highlights (v3.0.0 → v3.2.0)
 
-This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable achievements in the **v3.0.x** branch:
+This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable achievements across the **v3.x** branch:
 
+* **🔄 Stability Overhaul (v3.2.0):**
+  Multi-pass audit fixing sleep/wake lockup, mode-switching state leaks, LED flicker, and UART protocol edge cases. NRF sleep requests are now rejected when USB is active, all sync counters reset on mode switch, battery indicator auto-dismisses after 10s, and key debounce raised from 1ms to 5ms to eliminate double keypresses.
 * **⚡ Zero-Latency Wake & Command Hardening:**
   Solved a critical wait-for-ACK loop blocking issue in `rf.c`, restoring immediate, non-blocking serial parsing. Wireless startup dead-time has been slashed **5.4×** (1250ms → 230ms), and inline wakeup logic ensures that the first keystroke after deep sleep is preserved and registered within `2.7ms` (previously lost + 75ms).
 * **🔋 Power Consumption & USB Compliance:**
@@ -58,13 +60,13 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 * **🧠 Layout & UX Refinements:**
   Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
 * **🧹 Code Quality & Footprint Optimization:**
-  Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **limiting the final binary footprint to 56,654 bytes** (including all custom features).
+  Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **limiting the final binary footprint to 56,862 bytes** (including all custom features).
 * **📜 Full Revision History:**
   See [CHANGELOG.md](CHANGELOG.md) for the complete record of all engineering optimizations, bug fixes, and releases.
 
 ### 📊 Performance & Optimization Summary
 
-| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.0.8) | Impact & Improvement |
+| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.2.0) | Impact & Improvement |
 | :--- | :--- | :--- | :--- |
 | **Startup Dead-Time** | `1250ms` (worst-case) | `~230ms` | **5.4× faster boot-up** & instant availability |
 | **Active Periodic UART Utilization** | `11.3%` | `0.9%` | **12.5× reduced wireless bus congestion** |
@@ -74,7 +76,8 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 | **Mac Spotlight/Screenshot Lag** | `50ms` key-chord delay | `5ms` optimized chord delay | **Eliminated sluggish OS-shortcut latency** |
 | **USB Suspend Power Draw** | Exceeded limits (up to `20mA`) | Compliant **< 2.5mA** limit | **100% Standard USB Compliance** (stops battery drain) |
 | **UART Loop Transmit** | Blocked 5–10ms per wireless cmd | **Non-blocking (0ms)** concurrent polling | **Zero boot/wakeup locks**, flawless channel switching |
-| **Binary Footprint** | `56,490` bytes | `56,654` bytes | **Feature-rich layout** optimized for performance and completeness |
+| **Key Debounce** | `1ms` (double keypresses) | `5ms` sym_eager_pk | **Zero phantom repeats**, matches mechanical switch bounce |
+| **Binary Footprint** | `56,490` bytes | `56,862` bytes | **Feature-rich layout** optimized for performance and completeness |
 
 ## ✨ Features
 
