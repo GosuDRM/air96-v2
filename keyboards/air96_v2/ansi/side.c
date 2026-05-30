@@ -63,7 +63,7 @@ uint8_t side_speed          = 2;
 uint8_t side_rgb            = 1;
 uint8_t side_colour         = 0;
 uint8_t side_play_point     = 0;
-uint8_t side_play_cnt       = 0;
+uint16_t side_play_cnt      = 0;
 uint32_t side_play_timer    = 0;
 uint8_t r_temp, g_temp, b_temp;
 
@@ -163,12 +163,11 @@ void side_colour_control(uint8_t dir)
         if (side_rgb) {
             side_rgb    = 0;
             side_colour = LIGHT_COLOUR_MAX - 1;
+        } else if (side_colour == 0) {
+            side_rgb    = 1;
+            side_colour = 0;
         } else {
             side_colour--;
-            if (side_colour >= LIGHT_COLOUR_MAX) {
-                side_rgb    = 1;
-                side_colour = 0;
-            }
         }
     }
     user_config.ee_side_rgb    = side_rgb;
@@ -634,6 +633,11 @@ static void bat_percent_led(uint8_t bat_percent)
  */
 static void bat_led_show(void)
 {
+    /* Skip battery indicator in wired USB mode — keep rainbow */
+    if (dev_info.link_mode == LINK_USB) {
+        return;
+    }
+
     static uint8_t play_point      = 0;
     static uint32_t bat_play_timer = 0;
 
@@ -809,6 +813,21 @@ void rgb_test_show(void)
  */
 void m_side_led_show(void)
 {
+    /* Auto-clear f_bat_hold after 10 seconds */
+    {
+        static bool f_bat_hold_prev = false;
+        static uint32_t f_bat_hold_timer = 0;
+
+        if (f_bat_hold && !f_bat_hold_prev) {
+            f_bat_hold_timer = timer_read32();
+        }
+        f_bat_hold_prev = f_bat_hold;
+
+        if (f_bat_hold && timer_elapsed32(f_bat_hold_timer) > 10000) {
+            f_bat_hold = false;
+        }
+    }
+
     side_play_cnt += timer_elapsed32(side_play_timer);
     side_play_timer = timer_read32();
 
