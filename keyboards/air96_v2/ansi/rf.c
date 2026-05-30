@@ -36,8 +36,12 @@ extern uint8_t         rf_blink_cnt;
 extern uint16_t        rf_link_show_time;
 extern uint16_t        rf_linking_time;
 extern uint16_t        no_act_time;
-extern bool            f_send_channel;
-extern bool            f_dial_sw_init_ok;
+extern volatile bool f_send_channel;
+extern volatile bool f_dial_sw_init_ok;
+
+void rf_reset_sync_lost(void) {
+    sync_lost = 0;
+}
 
 report_mouse_t mousekey_get_report(void);
 void           uart_init(uint32_t baud); // qmk uart.c
@@ -222,6 +226,7 @@ static void RF_Protocol_Receive(void) {
         } else if (Usart_Mgr.RXDLen == 3) {
             if (Usart_Mgr.RXDBuf[2] == 0xA0) {
                 f_uart_ack = true;
+                sync_lost  = 0;
             }
             else {
                 return;
@@ -431,6 +436,10 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
             break;
     }
 
+    if (Usart_Mgr.TXDBuf[3] > UART_MAX_LEN - 5) {
+        return TX_DATA_ERR;
+    }
+
     f_uart_ack = 0;
     Usart_Mgr.TXDBuf[4 + Usart_Mgr.TXDBuf[3]] = get_checksum(&Usart_Mgr.TXDBuf[4], Usart_Mgr.TXDBuf[3]);
     UART_Send_Bytes(Usart_Mgr.TXDBuf, Usart_Mgr.TXDBuf[3] + 5);
@@ -478,6 +487,7 @@ void dev_sts_sync(void) {
     }
     else if (f_send_channel) {
         f_send_channel = false;
+        link_state_temp = RF_DISCONNECT;
         uart_send_cmd(CMD_SET_LINK, 10, 5);
     }
 
@@ -584,6 +594,9 @@ static uint8_t get_checksum(const uint8_t *buf, uint8_t len) {
  * @param report_size  report_size
  */
 void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t report_size) {
+    if (report_size > UART_MAX_LEN - 5) {
+        return;
+    }
     if (!f_dial_sw_init_ok) {
         return;
     }

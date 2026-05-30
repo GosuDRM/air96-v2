@@ -20,3 +20,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "host_driver.h"
 
 extern host_driver_t rf_host_driver;
+
+void rf_reset_sync_lost(void);
