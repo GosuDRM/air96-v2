@@ -38,7 +38,6 @@ uint32_t rf_disconnect_time = 0;
 void Sleep_Handle(void) {
     static uint32_t delay_step_timer = 0;
     static uint8_t  usb_suspend_debounce;
-    static uint8_t  wakeup_timeout = 0;
 
     /* 50ms interval */
     if (timer_elapsed32(delay_step_timer) < 50) {
@@ -70,11 +69,21 @@ void Sleep_Handle(void) {
     }
 
     if (f_wakeup_prepare) {
-        wakeup_timeout++;
-        if (no_act_time >= 10 && wakeup_timeout < 10) {
+        /* Stay asleep (LED drivers + RF powered down) until there is a real
+           reason to wake. Waking without a trigger is what made the side LEDs
+           blink while the PC was off: the board slept, woke ~500ms later with
+           nothing to do, slept again, and so on.
+
+           Genuine wake triggers:
+             - key/activity event: process_record_kb() resets no_act_time to 0.
+             - USB mode only: the host resumes the bus (exits USB_SUSPENDED). */
+        bool key_wake = (no_act_time < 10);
+        bool usb_wake = (dev_info.link_mode == LINK_USB && USB_DRIVER.state != USB_SUSPENDED);
+
+        if (!key_wake && !usb_wake) {
             return;
         }
-        wakeup_timeout = 0;
+
         f_wakeup_prepare = false;
         usb_suspend_debounce = 0;
         rf_disconnect_time = 0;
@@ -84,7 +93,10 @@ void Sleep_Handle(void) {
         writePinHigh(RGB_DRIVER_SDB2);
 
         uart_send_cmd(CMD_HAND, 0, 1);
-        {
+        /* Only flush key state on a host-driven wake. On a local key wake the
+           keypress that triggered the wake is already in flight; clearing it
+           here would release it mid-hold and corrupt the event. */
+        if (!key_wake) {
             extern void m_break_all_key(void);
             m_break_all_key();
         }
