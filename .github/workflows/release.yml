@@ -16,7 +16,10 @@ jobs:
 
     - name: Clone submodule dependencies
       run: |
+        # Pin ChibiOS to last pre-halconf-9_1_ commit (qmk-master HEAD moved past this)
         git clone --depth 1 https://github.com/qmk/ChibiOS lib/chibios
+        git -C lib/chibios fetch --depth 1 origin b95228cc3ac7ac4e7e8ae5a4a076c316905e032d
+        git -C lib/chibios checkout b95228cc3ac7ac4e7e8ae5a4a076c316905e032d
         git clone --depth 1 https://github.com/qmk/ChibiOS-Contrib lib/chibios-contrib
         git clone --depth 1 https://github.com/qmk/lufa lib/lufa
         git clone --depth 1 https://github.com/qmk/v-usb lib/vusb
