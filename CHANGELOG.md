@@ -2,6 +2,12 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.1 (2026-06-01)
+*Sleep/wake regression fixes — side LED blinking and wake-key corruption.*
+
+- **Side LEDs no longer blink when the PC is off**: The v3.2.0 "wakeup timeout fallback" woke the board ~500ms after every sleep with no real trigger, causing it to re-power the LEDs, fail to wake the off host, and re-suspend — an endless off/on cycle visible as blinking side lights. The board now stays asleep (LEDs and NRF powered down) until a genuine wake trigger: a keypress, or in USB mode the host actually resuming the bus.
+- **Wake keypress no longer corrupted**: On a local key-wake, the keypress that triggered the wake is already in flight; the v3.2.0 unconditional `m_break_all_key()` released it mid-hold. Key state is now only flushed on a host-driven (USB resume) wake, eliminating the dropped/doubled input on the first key after sleep.
+
 ## v3.2.0 (2026-05-31)
 *Stability overhaul — sleep/wake, mode switching, LED, and protocol fixes.*
 

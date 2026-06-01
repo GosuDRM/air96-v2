@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.2.0-blue.svg?style=for-the-badge" alt="Version"/></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.2.1-blue.svg?style=for-the-badge" alt="Version"/></a>
   <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-green.svg?style=for-the-badge" alt="License"/></a>
   <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
@@ -21,14 +21,14 @@ Binary output: `air96_v2_ansi_default.bin`
 
 ## ⚡ Flash
 
-📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.0.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.0/air96-v2-c-v3.2.0.bin)**
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.1.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.1/air96-v2-c-v3.2.1.bin)**
 
 Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
 
 ### 🐧 Linux
 Install `dfu-util` via your package manager (e.g. `sudo apt install dfu-util` or `sudo pacman -S dfu-util`), then run:
 ```bash
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.0.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.1.bin
 ```
 *Note: You may need `sudo` or to configure [QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules) to flash without root privileges.*
 
@@ -36,7 +36,7 @@ dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.0.bin
 Install `dfu-util` via Homebrew:
 ```bash
 brew install dfu-util
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.0.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.1.bin
 ```
 Alternatively, you can download and use the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
 
@@ -47,7 +47,7 @@ Alternatively, you can download and use the graphical [QMK Toolbox](https://gith
 4. Check the **Auto-Flash** checkbox.
 5. Hold the **Escape** key and plug in the USB cable. The flashing process will start automatically.
 
-## 🌟 Highlights (v3.0.0 → v3.2.0)
+## 🌟 Highlights (v3.0.0 → v3.2.1)
 
 This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable achievements across the **v3.x** branch:
 
@@ -66,7 +66,7 @@ This firmware has undergone extensive audit, bug-fixing, and performance hardeni
 
 ### 📊 Performance & Optimization Summary
 
-| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.2.0) | Impact & Improvement |
+| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.2.1) | Impact & Improvement |
 | :--- | :--- | :--- | :--- |
 | **Startup Dead-Time** | `1250ms` (worst-case) | `~230ms` | **5.4× faster boot-up** & instant availability |
 | **Active Periodic UART Utilization** | `11.3%` | `0.9%` | **12.5× reduced wireless bus congestion** |

@@ -35,7 +35,7 @@ make air96_v2/ansi:default
 
 ## ⚡ Flash
 
-📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.0.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.0/air96-v2-c-v3.2.0.bin)**
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.1.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.1/air96-v2-c-v3.2.1.bin)**
 
 1. Disconnect the keyboard's USB cable.
 2. Hold down the **Escape** key while plugging in the USB cable to enter DFU bootloader mode.
@@ -54,7 +54,7 @@ make air96_v2/ansi:via
 
 ## 🏷️ Version Specs
 
-- **Version:** `v3.2.0`
+- **Version:** `v3.2.1`
 - **Controller:** STM32F072
 - **RGB Matrix Driver:** Dual IS31FL3733 (110 individual RGB LEDs)
 - **Wireless Interface:** 460800 baud hardware UART interface to NRF52832 module
