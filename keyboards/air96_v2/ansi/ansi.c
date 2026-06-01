@@ -53,7 +53,9 @@ bool f_rf_sw_press      = 0;
 bool f_dev_reset_press  = 0;  
 bool f_rgb_test_press   = 0;  
 bool f_bat_num_show     = 0;
-uint8_t numlock_phase   = 0;  /* 0=idle, 1=press sent, 2=release next */
+uint8_t  numlock_phase        = 0;  /* 0=done, 1=armed, 2=holding press */
+uint32_t numlock_settle_start = 0;  /* set when USB first configured */
+uint32_t numlock_hold_start   = 0;  /* set when press registered */
 
 uint8_t host_mode;
 host_driver_t *m_host_driver   = 0;
@@ -80,16 +82,17 @@ void device_reset_show(void);
 void device_reset_init(void);
 void rgb_test_show(void);
 
-extern uint8_t side_mode;    
-extern uint8_t side_light;  
-extern uint8_t side_speed;  
-extern uint8_t side_rgb;    
-extern uint8_t side_colour;  
+extern uint8_t side_mode;
+extern uint8_t side_light;
+extern uint8_t side_speed;
+extern uint8_t side_rgb;
+extern uint8_t side_colour;
 extern report_keyboard_t *keyboard_report;
 extern report_nkro_t *nkro_report;
 extern uint8_t uart_bit_report_buf[32];
 extern uint8_t bitkb_report_buf[32];
 extern uint8_t bytekb_report_buf[8];
+extern bool f_bit_kb_act;
 
 extern void eeconfig_update_user_datablock(const void *data);
 extern void light_speed_control(uint8_t fast);
@@ -243,7 +246,6 @@ void m_break_all_key(void)
     memset(bytekb_report_buf, 0, sizeof(bytekb_report_buf));
 
     /* Clear NKRO active flag to stop periodic resends of stale bit reports */
-    extern bool f_bit_kb_act;
     f_bit_kb_act = false;
 }
 
@@ -332,18 +334,20 @@ static void dial_sw_scan(void)
     if (dial_scan & 0x02) {
         if (dev_info.sys_sw_state != SYS_SW_MAC) {
             f_sys_show = true;
-            default_layer_set(1 << 0);  
+            default_layer_set(1 << 0);
             dev_info.sys_sw_state = SYS_SW_MAC;
-            keymap_config.nkro    = false; 
-            m_break_all_key();        
+            keymap_config.nkro    = false;
+            /* Held keys were already released by m_break_all_key() above
+               on the first tick of the dial change; calling it again here
+               would re-block the main loop for ~20ms. */
         }
     } else {
         if (dev_info.sys_sw_state != SYS_SW_WIN) {
             f_sys_show = true;
-            default_layer_set(1 << 2);  
+            default_layer_set(1 << 2);
             dev_info.sys_sw_state = SYS_SW_WIN;
-            keymap_config.nkro    = true;  
-            m_break_all_key();        
+            keymap_config.nkro    = true;
+            /* See note above — no second m_break_all_key(). */
         }
     }
 
@@ -459,7 +463,11 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     f_rf_sw_press = 1;
                     m_break_all_key();
                 }
-            } else if (f_rf_sw_press) {
+            } else if (f_rf_sw_press && ch == rf_sw_temp) {
+                /* Only fire on release of the same key that was pressed.
+                   Without this check, holding LNK_BLE1 and tapping LNK_BLE2
+                   would let BLE1's release trigger a switch to BLE1's channel
+                   (ch=1) even though the user already moved on to BLE2. */
                 f_rf_sw_press = 0;
                 if (rf_sw_press_delay < RF_LONG_PRESS_DELAY) {
                     dev_info.link_mode   = ch;
@@ -672,7 +680,7 @@ static void m_londing_eeprom_data(void)
 {
     eeconfig_read_user_datablock(&user_config);
     if (user_config.default_brightness_flag != 0xA5) {
-        rgb_matrix_sethsv(255, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS - RGB_MATRIX_VAL_STEP * 2); 
+        rgb_matrix_sethsv(255, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS - RGB_MATRIX_VAL_STEP * 2);
         user_config.default_brightness_flag = 0xA5;
         user_config.ee_side_mode            = side_mode;
         user_config.ee_side_light           = side_light;
@@ -680,7 +688,7 @@ static void m_londing_eeprom_data(void)
         user_config.ee_side_rgb             = side_rgb;
         user_config.ee_side_colour          = side_colour;
         user_config.sleep_enable            = true;
-        eeconfig_update_user_datablock(&user_config);  
+        eeconfig_update_user_datablock(&user_config);
     } else {
         side_mode   = user_config.ee_side_mode;
         side_light  = user_config.ee_side_light;
@@ -689,7 +697,10 @@ static void m_londing_eeprom_data(void)
         side_colour = user_config.ee_side_colour;
     }
 
-    /* Clamp side config from EEPROM to prevent OOB on colour_lib[8] and other tables */
+    /* Always clamp side config to prevent OOB on colour_lib[8] and other
+       tables — including the first-boot path, which previously skipped
+       the clamp and could inherit a valid flag (and thus stale values)
+       from a prior firmware flash. */
     if (side_mode > 4) side_mode = 0;
     if (side_light > 5) side_light = 3;
     if (side_speed > 4) side_speed = 2;
@@ -757,13 +768,25 @@ void housekeeping_task_kb(void)
 
     m_side_led_show();
 
-    /* One-shot NumLock ON at boot. Uses register_code/unregister_code
-       across two housekeeping ticks so the key is in the report when
-       the main loop sends it. Matches Rust firmware approach. */
+    /* One-shot NumLock ON at boot. Wait 2s after USB enumeration for
+       the host to settle, then require a 200ms idle window so the press
+       can't land on top of the user's first keypresses (which was
+       flipping host NumLock state mid-typing on the numpad). Hold the
+       press for 50ms so even the slowest host reliably registers the
+       toggle, and skip entirely if the host already has NumLock on. */
     if (numlock_phase == 1 && usb_device_state == USB_DEVICE_STATE_CONFIGURED) {
-        register_code(KC_NUM_LOCK);
-        numlock_phase = 2;
-    } else if (numlock_phase == 2) {
+        if (numlock_settle_start == 0) {
+            numlock_settle_start = timer_read32();
+        } else if (timer_elapsed32(numlock_settle_start) >= 2000 && no_act_time > 20) {
+            if (!host_keyboard_led_state().num_lock) {
+                register_code(KC_NUM_LOCK);
+                numlock_phase      = 2;
+                numlock_hold_start = timer_read32();
+            } else {
+                numlock_phase = 0;
+            }
+        }
+    } else if (numlock_phase == 2 && timer_elapsed32(numlock_hold_start) >= 50) {
         unregister_code(KC_NUM_LOCK);
         numlock_phase = 0;
     }

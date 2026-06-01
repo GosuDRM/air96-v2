@@ -98,18 +98,18 @@ void suspend_wakeup_init_kb(void)
  */
 void light_level_control(uint8_t brighten)
 {
-    if (brighten)
-    {
+    if (brighten) {
         if (side_light == 5) {
             return;
-        } else
+        } else {
             side_light++;
-    } else
-    {
+        }
+    } else {
         if (side_light == 0) {
             return;
-        } else
+        } else {
             side_light--;
+        }
     }
     user_config.ee_side_light = side_light;
     eeconfig_update_user_datablock(&user_config);
@@ -117,7 +117,7 @@ void light_level_control(uint8_t brighten)
 
 /**
  * @brief  Adjusting the speed of side lights.
- * @param  dir: 0 - decrease, 1 - increase.
+ * @param  fast: 1 - faster, 0 - slower. Lower side_speed = faster animation.
  * @note  save to eeprom.
  */
 void light_speed_control(uint8_t fast)
@@ -457,7 +457,8 @@ static void side_static_mode_show(void)
         side_play_cnt -= side_speed_table[side_mode][side_speed];
     if (side_play_cnt > 20) side_play_cnt = 0;
 
-    if (side_play_point >= SIDE_COLOUR_MAX) side_play_point = 0;
+    /* side_play_point is not used in the static path (we read side_colour
+       directly); the prior clamp was dead code. */
 
     for (int i = 0; i < SIDE_LINE; i++) {
         r_temp = colour_lib[side_colour][0];

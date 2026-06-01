@@ -2,6 +2,14 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.2 (2026-06-02)
+*Bug-fix pass — boot NumLock reliability, link-key cross-release, dial latency.*
+
+- **No more double input at boot**: The auto-NumLock one-shot now waits 2 s after USB enumeration, requires a 200 ms idle window, and holds the press for 50 ms. The old 1 ms press was both too short for some hosts to register and could land on top of the user's first keypress, toggling host NumLock mid-typing. The host's current NumLock state is now also checked, so the toggle is skipped if it's already on.
+- **Link keys no longer cross-fire**: Holding `LNK_BLE1` and tapping `LNK_BLE2` no longer switches the keyboard to BLE1 on BLE1's release — only the key that was actually pressed now triggers the switch on release.
+- **Faster dial switching**: A single physical dial detent previously called `m_break_all_key()` up to three times (~60 ms of blocking). The redundant calls in the SYS-mode branches are gone, since the first-tick release already covers the held-key case.
+- **Safer EEPROM load**: The OOB clamps on `side_mode/light/speed/rgb/colour` now run on every boot, not just subsequent ones — so a stale flag from a prior firmware flash can't push the animation into a bad state.
+
 ## v3.2.1 (2026-06-01)
 *Sleep/wake regression fixes — side LED blinking and wake-key corruption.*
 
