@@ -2,6 +2,11 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.3 (2026-06-02)
+*Incremental I2C flush — eliminates keystroke hiccups during rapid typing.*
+
+- **Chunked RGB LED writes**: The IS31FL3733 PWM flush now writes one 16-byte I2C chunk per main-loop iteration (~0.2 ms) instead of all 24 transactions in one blocking call (~4 ms). The key matrix scan runs between chunks, so fast keypresses that previously landed inside the long I2C window are no longer missed. Fixes the characteristic `kkkkkk(lag)kkkkkk` stutter seen during rapid typing.
+
 ## v3.2.2 (2026-06-02)
 *Bug-fix pass — boot NumLock reliability, link-key cross-release, dial latency.*
 

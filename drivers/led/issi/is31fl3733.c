@@ -278,3 +278,53 @@ void is31fl3733_flush(void) {
         is31fl3733_update_pwm_buffers(i);
     }
 }
+
+bool is31fl3733_flush_continue(void) {
+    static uint8_t flush_driver = 0;
+    static uint8_t flush_chunk = 0;
+    static bool    flush_page_selected = false;
+
+    // Find next dirty driver if not already in progress
+    if (!flush_page_selected) {
+        while (flush_driver < IS31FL3733_DRIVER_COUNT &&
+               !driver_buffers[flush_driver].pwm_buffer_dirty) {
+            flush_driver++;
+            flush_chunk = 0;
+        }
+        if (flush_driver >= IS31FL3733_DRIVER_COUNT) {
+            // All done — reset for next call
+            flush_driver = 0;
+            flush_chunk = 0;
+            return true;
+        }
+        // Select PWM page once per driver
+        is31fl3733_select_page(flush_driver, IS31FL3733_COMMAND_PWM);
+        flush_page_selected = true;
+        flush_chunk = 0;
+    }
+
+    // Write one 16-byte chunk
+    uint8_t reg = flush_chunk * 16;
+#if IS31FL3733_I2C_PERSISTENCE > 0
+    for (uint8_t j = 0; j < IS31FL3733_I2C_PERSISTENCE; j++) {
+        if (i2c_write_register(i2c_addresses[flush_driver] << 1, reg,
+                               driver_buffers[flush_driver].pwm_buffer + reg,
+                               16, IS31FL3733_I2C_TIMEOUT) == I2C_STATUS_SUCCESS) break;
+    }
+#else
+    i2c_write_register(i2c_addresses[flush_driver] << 1, reg,
+                       driver_buffers[flush_driver].pwm_buffer + reg,
+                       16, IS31FL3733_I2C_TIMEOUT);
+#endif
+
+    flush_chunk++;
+    if (flush_chunk >= IS31FL3733_PWM_REGISTER_COUNT / 16) {
+        // All 12 chunks done for this driver
+        driver_buffers[flush_driver].pwm_buffer_dirty = false;
+        flush_driver++;
+        flush_chunk = 0;
+        flush_page_selected = false;
+    }
+
+    return false; // more to do
+}

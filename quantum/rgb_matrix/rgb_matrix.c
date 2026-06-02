@@ -343,8 +343,15 @@ static void rgb_task_flush(uint8_t effect) {
     rgb_last_effect = effect;
     rgb_last_enable = rgb_matrix_config.enable;
 
-    // update pwm buffers
+    // incremental flush: one 16-byte I2C transaction per call (~0.2ms)
+    // so matrix scan runs between chunks instead of blocking for ~4ms
+#if defined(RGB_MATRIX_IS31FL3733)
+    if (!is31fl3733_flush_continue()) {
+        return; // more chunks to write — stay in FLUSHING
+    }
+#else
     rgb_matrix_update_pwm_buffers();
+#endif
 
     // next task
     rgb_task_state = SYNCING;

@@ -157,6 +157,7 @@ void is31fl3733_update_pwm_buffers(uint8_t index);
 void is31fl3733_update_led_control_registers(uint8_t index);
 
 void is31fl3733_flush(void);
+bool is31fl3733_flush_continue(void);
 
 #define IS31FL3733_PDR_0_OHM 0b000   // No pull-down resistor
 #define IS31FL3733_PDR_0K5_OHM 0b001 // 0.5 kOhm resistor
