@@ -115,17 +115,11 @@ void Sleep_Handle(void) {
             m_break_all_key();
         }
 
-        if (dev_info.link_mode == LINK_USB) {
-            if ((USB_DRIVER.status & USB_GETSTATUS_REMOTE_WAKEUP_ENABLED)) {
-                usb_lld_wakeup_host(&USB_DRIVER);
-                wait_ms(50);
-                uint8_t timeout = 5;
-                while ((USB_DRIVER.state == USB_SUSPENDED) && (timeout--)) {
-                    usbWakeupHost(&USB_DRIVER);
-                    restart_usb_driver(&USB_DRIVER);
-                    wait_ms(50);
-                }
-            }
+        if (key_wake && dev_info.link_mode == LINK_USB && USB_DRIVER.state == USB_SUSPENDED &&
+            (USB_DRIVER.status & USB_GETSTATUS_REMOTE_WAKEUP_ENABLED)) {
+            /* The USB driver owns the resume pulse; keep scanning while the
+               host wakes, without restarting enumeration. */
+            usbWakeupHost(&USB_DRIVER);
         }
     }
 

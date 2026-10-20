@@ -30,17 +30,19 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install qmk
 
-    - name: RF responsiveness regressions
+    - name: Regression tests
       run: |
-        python3 tests/air96_rf_test.py
-        python3 tests/air96_wireless_test.py
-        python3 tests/air96_transport_test.py
+        for test in tests/air96_*_test.py; do python3 "$test"; done
 
     - name: Compile Air96 V2
-      run: qmk compile -kb air96_v2/ansi -km default
+      run: |
+        qmk compile -kb air96_v2/ansi -km default
+        qmk compile -kb air96_v2/ansi -km via
 
     - name: Upload firmware
       uses: actions/upload-artifact@v4
       with:
         name: air96-v2-firmware
-        path: air96_v2_ansi_default.bin
+        path: |
+          air96_v2_ansi_default.bin
+          air96_v2_ansi_via.bin

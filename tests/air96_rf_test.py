@@ -61,11 +61,20 @@ static void key(unsigned k,bool down){
 }
 static bool represented(unsigned k){
     for(unsigned i=2;i<8;i++)if(bytekb_report_buf[i]==k)return true;
-    return k<120 && (uart_bit_report_buf[1+k/8]&(1U<<(k%8)));
+    return k<112 && (uart_bit_report_buf[1+k/8]&(1U<<(k%8)));
 }
 int main(void){
     for(unsigned k=4;k<=9;k++)key(k,true);
     assert(bit_sends==0); // ordinary six-key typing keeps the byte format
+    // The receiver advertises usages 0..111, despite the 16-byte UART payload.
+    key(111,true);assert(represented(111));key(111,false);
+    for(unsigned k=112;k<120;k++){
+        key(k,true);
+        assert(represented(k));
+        assert(!(uart_bit_report_buf[1+k/8]&(1U<<(k%8))));
+        for(unsigned held_key=4;held_key<=9;held_key++)assert(represented(held_key));
+        key(k,false);assert(!represented(k));
+    }
     key(135,true); // high usage must survive six occupied byte slots
     for(unsigned k=4;k<=9;k++)assert(represented(k));
     assert(represented(135));

@@ -33,23 +33,19 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install qmk
 
-    - name: Compile Air96 V2
-      run: qmk compile -kb air96_v2/ansi -km default
-
-    - name: Rename binary
-      run: mv air96_v2_ansi_default.bin air96-v2-c-${{ github.ref_name }}.bin
-
-    - name: Update README with dynamic release link
+    - name: Regression tests
       run: |
-        VERSION="${{ github.ref_name }}"
-        sed -i -E "s|air96-v2-c-v[0-9.]+\\.bin|air96-v2-c-${VERSION}.bin|g" README.md
-        sed -i -E "s|air96-v2-c-v[0-9.]+\\.bin|air96-v2-c-${VERSION}.bin|g" keyboards/air96_v2/ansi/readme.md
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add README.md keyboards/air96_v2/ansi/readme.md
-        git commit -m "docs: dynamically update pre-compiled firmware links to ${VERSION} [skip ci]" || echo "No changes to commit"
-        git push origin HEAD:master
+        for test in tests/air96_*_test.py; do python3 "$test"; done
 
+    - name: Compile Air96 V2
+      run: |
+        qmk compile -kb air96_v2/ansi -km default
+        qmk compile -kb air96_v2/ansi -km via
+
+    - name: Rename binaries
+      run: |
+        mv air96_v2_ansi_default.bin air96-v2-c-${{ github.ref_name }}.bin
+        mv air96_v2_ansi_via.bin air96-v2-via-${{ github.ref_name }}.bin
 
     - name: Extract changelog
       run: |
@@ -66,4 +62,7 @@ jobs:
       with:
         name: NuPhy Air96 V2 Firmware ${{ github.ref_name }}
         body_path: /tmp/release_notes.md
-        files: air96-v2-c-${{ github.ref_name }}.bin
+        fail_on_unmatched_files: true
+        files: |
+          air96-v2-c-${{ github.ref_name }}.bin
+          air96-v2-via-${{ github.ref_name }}.bin

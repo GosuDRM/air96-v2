@@ -298,29 +298,34 @@ bool is31fl3733_flush_continue(void) {
             return true;
         }
         // Select PWM page once per driver
-        is31fl3733_select_page(flush_driver, IS31FL3733_COMMAND_PWM);
+        uint8_t unlock = IS31FL3733_COMMAND_WRITE_LOCK_MAGIC;
+        uint8_t page = IS31FL3733_COMMAND_PWM;
+        if (i2c_write_register(i2c_addresses[flush_driver] << 1, IS31FL3733_REG_COMMAND_WRITE_LOCK,
+                               &unlock, 1, IS31FL3733_I2C_TIMEOUT) != I2C_STATUS_SUCCESS ||
+            i2c_write_register(i2c_addresses[flush_driver] << 1, IS31FL3733_REG_COMMAND,
+                               &page, 1, IS31FL3733_I2C_TIMEOUT) != I2C_STATUS_SUCCESS) {
+            return false;
+        }
         flush_page_selected = true;
         flush_chunk = 0;
+        /* Changes made between chunks set dirty again for the next pass. */
+        driver_buffers[flush_driver].pwm_buffer_dirty = false;
     }
 
     // Write one 16-byte chunk
     uint8_t reg = flush_chunk * 16;
-#if IS31FL3733_I2C_PERSISTENCE > 0
-    for (uint8_t j = 0; j < IS31FL3733_I2C_PERSISTENCE; j++) {
-        if (i2c_write_register(i2c_addresses[flush_driver] << 1, reg,
-                               driver_buffers[flush_driver].pwm_buffer + reg,
-                               16, IS31FL3733_I2C_TIMEOUT) == I2C_STATUS_SUCCESS) break;
+    if (i2c_write_register(i2c_addresses[flush_driver] << 1, reg,
+                           driver_buffers[flush_driver].pwm_buffer + reg,
+                           16, IS31FL3733_I2C_TIMEOUT) != I2C_STATUS_SUCCESS) {
+        /* Retry on a later scan, including page selection after a bus error. */
+        driver_buffers[flush_driver].pwm_buffer_dirty = true;
+        flush_page_selected = false;
+        return false;
     }
-#else
-    i2c_write_register(i2c_addresses[flush_driver] << 1, reg,
-                       driver_buffers[flush_driver].pwm_buffer + reg,
-                       16, IS31FL3733_I2C_TIMEOUT);
-#endif
 
     flush_chunk++;
     if (flush_chunk >= IS31FL3733_PWM_REGISTER_COUNT / 16) {
         // All 12 chunks done for this driver
-        driver_buffers[flush_driver].pwm_buffer_dirty = false;
         flush_driver++;
         flush_chunk = 0;
         flush_page_selected = false;

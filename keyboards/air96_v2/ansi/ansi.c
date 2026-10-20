@@ -90,9 +90,6 @@ extern uint8_t side_rgb;
 extern uint8_t side_colour;
 extern report_keyboard_t *keyboard_report;
 extern report_nkro_t *nkro_report;
-extern uint8_t uart_bit_report_buf[32];
-extern uint8_t bitkb_report_buf[32];
-extern uint8_t bytekb_report_buf[8];
 extern bool f_bit_kb_act;
 
 extern void eeconfig_update_user_datablock(const void *data);
@@ -136,11 +133,21 @@ static void m_gpio_init(void)
 static void long_press_key(void)
 {
     static uint32_t long_press_timer = 0;
+    static uint8_t pairing_retries;
 
     if (timer_elapsed32(long_press_timer) < 50) {
         return;
     }
     long_press_timer = timer_read32();
+
+    if (pairing_retries) {
+        if (dev_info.rf_state != RF_PAIRING || f_rf_new_adv_ok) {
+            pairing_retries = 0;
+        } else {
+            pairing_retries--;
+            uart_send_cmd(CMD_NEW_ADV, 0, 0);
+        }
+    }
 
     if (f_rf_sw_press) {
         rf_sw_press_delay++;
@@ -152,15 +159,8 @@ static void long_press_key(void)
             dev_info.rf_channel  = rf_sw_temp;
             dev_info.ble_channel = rf_sw_temp;
 
-            uint8_t timeout = 3;
-            while (timeout--) {
-                uart_send_cmd(CMD_NEW_ADV, 0, 1);
-                wait_ms(20);
-                uart_receive_pro();                   
-                if (f_rf_new_adv_ok) {
-                    break;
-                }
-            }
+            uart_send_cmd(CMD_NEW_ADV, 0, 0);
+            pairing_retries = 2;
         }
     } else {
         rf_sw_press_delay = 0;
@@ -182,7 +182,7 @@ static void long_press_key(void)
                 dev_info.rf_channel  = LINK_BT_1;
             }
 
-            uart_send_cmd(CMD_SET_LINK, 10, 5);
+            uart_send_cmd(CMD_SET_LINK, 0, 0);
             wait_ms(500);
             uart_send_cmd(CMD_CLR_DEVICE, 10, 5);
 
@@ -225,12 +225,10 @@ void m_break_all_key(void)
     keymap_config.nkro = true;
     memset(nkro_report, 0, sizeof(report_nkro_t));
     host_nkro_send(nkro_report);
-    wait_ms(10);
 
     keymap_config.nkro = false;
     memset(keyboard_report, 0, sizeof(report_keyboard_t));
     host_keyboard_send(keyboard_report);
-    wait_ms(10);
 
     keymap_config.nkro = nkro_temp;
 
@@ -238,9 +236,7 @@ void m_break_all_key(void)
         uint8_t report_buf[16];
         memset(report_buf, 0, 16);
         uart_send_report(CMD_RPT_BIT_KB, report_buf, 16);
-        wait_ms(10);
         uart_send_report(CMD_RPT_BYTE_KB, report_buf, 8);
-        wait_ms(10);
     }
 
     memset(uart_bit_report_buf, 0, sizeof(uart_bit_report_buf));
@@ -258,6 +254,8 @@ void m_break_all_key(void)
 static void switch_dev_link(uint8_t mode)
 {
     if (mode > LINK_USB) return;
+    if (numlock_phase == 2) numlock_phase = 0;
+    numlock_settle_start = 0;
     m_break_all_key();    
 
     f_goto_sleep = false;
@@ -290,12 +288,8 @@ static void dial_sw_scan(void)
     static uint8_t dial_save        = 0xf0;
     static uint8_t debounce         = 0;
     static uint32_t dial_scan_timer = 0;
-    static bool     f_first         = true;
-
-    if (!f_first) {
-        if (timer_elapsed32(dial_scan_timer) < 20) {
-            return;
-        }
+    if (timer_elapsed32(dial_scan_timer) < 20) {
+        return;
     }
     dial_scan_timer = timer_read32();
 
@@ -310,14 +304,9 @@ static void dial_sw_scan(void)
     }
 
     if (dial_save != dial_scan) {
-        m_break_all_key(); 
-
-        no_act_time     = 0;  
-        rf_linking_time = 0; 
-
+        /* Keep reports on the current host until the switch is stable. */
         dial_save         = dial_scan;
         debounce          = 25;  
-        f_dial_sw_init_ok = false;  
         return;
     } else if (debounce) {
         debounce--;
@@ -336,27 +325,24 @@ static void dial_sw_scan(void)
 
     if (dial_scan & 0x02) {
         if (dev_info.sys_sw_state != SYS_SW_MAC) {
+            m_break_all_key();
             f_sys_show = true;
             default_layer_set(1 << 0);
             dev_info.sys_sw_state = SYS_SW_MAC;
-            keymap_config.nkro    = false;
-            /* Held keys were already released by m_break_all_key() above
-               on the first tick of the dial change; calling it again here
-               would re-block the main loop for ~20ms. */
+            keymap_config.nkro    = true;
         }
     } else {
         if (dev_info.sys_sw_state != SYS_SW_WIN) {
+            m_break_all_key();
             f_sys_show = true;
             default_layer_set(1 << 2);
             dev_info.sys_sw_state = SYS_SW_WIN;
             keymap_config.nkro    = true;
-            /* See note above — no second m_break_all_key(). */
         }
     }
 
     if (!f_dial_sw_init_ok) {
         f_dial_sw_init_ok = true; 
-        f_first           = false;
 
         if (dev_info.link_mode != LINK_USB) {
             host_set_driver(&rf_host_driver);
@@ -413,17 +399,29 @@ static void m_power_on_dial_sw_scan(void)
         if (dev_info.sys_sw_state != SYS_SW_MAC) {
             default_layer_set(1 << 0);  
             dev_info.sys_sw_state = SYS_SW_MAC;
-            keymap_config.nkro    = false; 
+            keymap_config.nkro    = true;
             m_break_all_key();  
         }
     } else {
         if (dev_info.sys_sw_state != SYS_SW_WIN) {
             default_layer_set(1 << 2);  
             dev_info.sys_sw_state = SYS_SW_WIN;
-            keymap_config.nkro    = true; 
+            keymap_config.nkro    = true;
             m_break_all_key();     
         }
     }
+}
+
+/* Shortcuts borrow modifiers without releasing physically held modifiers. */
+static void tap_shortcut(uint8_t mods, uint8_t key) {
+    uint8_t saved_weak_mods = get_weak_mods();
+    bool held = is_key_pressed(key);
+    add_weak_mods(mods);
+    register_code(key);
+    wait_ms(5);
+    if (!held) unregister_code(key);
+    set_weak_mods(saved_weak_mods);
+    send_keyboard_report();
 }
 
 /**
@@ -443,13 +441,11 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             return false;
 
         case LNK_USB:
-            if (record->event.pressed) {
-                m_break_all_key();
-            } else {
+            if (!record->event.pressed) {
                 if (dev_info.link_mode != LINK_USB) {
                     switch_dev_link(LINK_USB);
                     f_send_channel = false;
-                    uart_send_cmd(CMD_SET_LINK, 10, 5);
+                    uart_send_cmd(CMD_SET_LINK, 0, 0);
                 }
                 rf_blink_cnt = 3;
             }
@@ -465,7 +461,6 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 if (dev_info.link_mode != LINK_USB) {
                     rf_sw_temp    = ch;
                     f_rf_sw_press = 1;
-                    m_break_all_key();
                 }
             } else if (f_rf_sw_press && ch == rf_sw_temp) {
                 /* Only fire on release of the same key that was pressed.
@@ -478,7 +473,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                     f_send_channel = false; /* Send immediately below. */
                     dev_info.rf_channel  = ch;
                     dev_info.ble_channel = ch;
-                    uart_send_cmd(CMD_SET_LINK, 10, 5);
+                    uart_send_cmd(CMD_SET_LINK, 0, 0);
                 }
             }
             return false;
@@ -494,12 +489,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
         case MAC_SEARCH:
             if (record->event.pressed) {
-                register_code(KC_LGUI);
-                register_code(KC_SPACE);
-                uart_send_report_func();
-                wait_ms(5);
-                unregister_code(KC_LGUI);
-                unregister_code(KC_SPACE);
+                tap_shortcut(MOD_BIT(KC_LGUI), KC_SPACE);
             }
             return false;
 
@@ -529,36 +519,13 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
         case MAC_PRT:
             if (record->event.pressed) {
-                register_code(KC_LGUI);
-                register_code(KC_LSFT);
-                register_code(KC_3);
-                wait_ms(5);
-                unregister_code(KC_3);
-                unregister_code(KC_LSFT);
-                unregister_code(KC_LGUI);
+                tap_shortcut(MOD_BIT(KC_LGUI) | MOD_BIT(KC_LSFT), KC_3);
             }
             return false;
 
         case MAC_PRTA:
             if (record->event.pressed) {
-                if (keymap_config.nkro) {
-                    register_code(KC_LGUI);
-                    register_code(KC_LSFT);
-                    register_code(KC_S);
-                    wait_ms(5);
-                    unregister_code(KC_S);
-                    unregister_code(KC_LSFT);
-                    unregister_code(KC_LGUI);
-                }
-                else {
-                    register_code(KC_LGUI);
-                    register_code(KC_LSFT);
-                    register_code(KC_4);
-                    wait_ms(5);
-                    unregister_code(KC_4);
-                    unregister_code(KC_LSFT);
-                    unregister_code(KC_LGUI);
-                }
+                tap_shortcut(MOD_BIT(KC_LGUI) | MOD_BIT(KC_LSFT), dev_info.sys_sw_state == SYS_SW_WIN ? KC_S : KC_4);
             }
             return false;
 
@@ -779,7 +746,11 @@ void housekeeping_task_kb(void)
        flipping host NumLock state mid-typing on the numpad). Hold the
        press for 50ms so even the slowest host reliably registers the
        toggle, and skip entirely if the host already has NumLock on. */
-    if (numlock_phase == 1 && usb_device_state == USB_DEVICE_STATE_CONFIGURED) {
+    if (dev_info.link_mode != LINK_USB || host_mode != HOST_USB_TYPE || usb_device_state != USB_DEVICE_STATE_CONFIGURED) {
+        numlock_settle_start = 0;
+        return;
+    }
+    if (numlock_phase == 1) {
         if (numlock_settle_start == 0) {
             numlock_settle_start = timer_read32();
         } else if (timer_elapsed32(numlock_settle_start) >= 2000 && no_act_time > 20) {

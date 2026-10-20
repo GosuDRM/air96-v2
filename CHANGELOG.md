@@ -2,6 +2,24 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.7 (2026-10-20)
+*Input responsiveness, dongle compatibility, and runtime hardening.*
+
+- Limit wireless bitmap allocation to the dongle's advertised HID usages 0..111. Keep F21-F24 and other higher usages in byte-report slots, retaining the established 16-byte UART bitmap frame.
+- Reduce 2.4 GHz recovery replay spacing from 8 ms to 2 ms, retaining ordered delivery and Bluetooth's 8 ms spacing. A simulated 40-report backlog drains in 80 ms instead of 320 ms. Normal input bypasses recovery pacing.
+- Add regressions for the bitmap boundary, per-mode pacing, new input during replay, and backlog drain time. Actual receiver throughput and perceived latency still require hardware validation; this does not fix radio interference or the dongle's USB descriptors.
+
+- Keep reports flowing to the current host while physical switches settle; clear held keys when the switch takes effect and enforce the dial scan interval.
+- Remove fixed waits from key clearing and channel selection. Schedule pairing retries between scans instead of blocking keyboard processing.
+- Request USB remote wake only for local activity while the host is suspended, without blocking waits or restarting USB enumeration.
+- Retry failed incremental LED page selection and PWM writes on later scans; preserve color changes made during an active flush.
+- Increase recovery capacity to 64 reports so the tested 20-tap repeated/alternating burst survives a 400 ms outage; larger bursts can still overflow.
+- Keep NKRO enabled in both OS layouts and select screenshot shortcuts by OS mode.
+- Expire queued wireless taps after one second and resynchronize current endpoint states, preventing old input from replaying after prolonged outages.
+- Correct shared report-buffer declarations, preserve held shortcut keys and modifiers, and restrict automatic NumLock handling to the USB host.
+- Expand host regression coverage for switch settling, USB wake, LED write failures, key clearing, buffer boundaries, and recovery replay. Build both default and VIA keymaps in CI and run focused clang-tidy correctness checks.
+- Validation: host regressions, default/VIA builds, cppcheck, and focused clang-tidy pass. Real keyboard/RF delivery and physical latency remain unverified.
+
 ## v3.2.5 (2026-10-20)
 *Wireless recovery, input delivery, and protocol handling.*
 

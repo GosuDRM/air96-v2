@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #include "host_driver.h"
+#include "report.h"
 
 extern host_driver_t rf_host_driver;
+
+extern uint8_t uart_bit_report_buf[NKRO_REPORT_BITS + 1];
+extern uint8_t bitkb_report_buf[NKRO_REPORT_BITS + 1];
+extern uint8_t bytekb_report_buf[8];
 
 void rf_reset_sync_lost(void);

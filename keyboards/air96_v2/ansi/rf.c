@@ -44,13 +44,27 @@ static uint8_t reset_phase;
 static bool rf_recovering;
 static uint8_t pending_cmd;
 static bool waiting_ack;
-#define RF_QUEUE_SIZE 32
-static struct { uint8_t type, size, data[16]; } rf_queue[RF_QUEUE_SIZE];
+/* 32 complete taps fit during a short radio reset (press + release). */
+#define RF_QUEUE_SIZE 64
+#define RF_REPLAY_MAX_AGE_MS 1000
+static struct { uint8_t type, size, data[16]; uint32_t captured_at; } rf_queue[RF_QUEUE_SIZE];
 static uint8_t queue_head, queue_count;
 static uint8_t latest_reports[5][16];
 static const uint8_t report_sizes[5] = {5, 8, 16, 2, 2};
 static uint32_t replay_timer;
 static void rf_replay_task(void);
+
+/* Old taps expire; current states still release any keys held by the host. */
+static void rf_queue_resync(void) {
+    queue_head = 0;
+    queue_count = 5;
+    for (uint8_t i = 0; i < 5; i++) {
+        rf_queue[i].type = CMD_RPT_MS + i;
+        rf_queue[i].size = report_sizes[i];
+        rf_queue[i].captured_at = timer_read32();
+        memcpy(rf_queue[i].data, latest_reports[i], report_sizes[i]);
+    }
+}
 
 void rf_reset_sync_lost(void) {
     sync_lost = 0;
@@ -79,19 +93,20 @@ uint16_t       host_last_consumer_usage(void);
 bool f_bit_kb_act = false;
 static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *now_bit_report, uint8_t size)
 {
-    /* The NRF bitmap has 15 key bytes. Keep higher usages in the six
-       byte slots, moving bitmap-capable keys out of their way as needed. */
+    /* The dongle HID descriptor exposes usages 0..111. The UART frame
+       remains 16 bytes; reserve its unused last bitmap byte as zero.
+       Keep higher usages in the six byte slots. */
     uint8_t next_byte[8] = {now_bit_report[0], 0};
     uint8_t next_bit[16] = {now_bit_report[0]};
     uint8_t slot = 2;
     (void)pre_bit_report;
 
-    for (uint16_t key = 120; key < (size - 1) * 8; key++) {
+    for (uint16_t key = 112; key < (size - 1) * 8; key++) {
         if ((now_bit_report[1 + key / 8] & (1U << (key % 8))) && slot < 8) {
             next_byte[slot++] = key;
         }
     }
-    for (uint8_t key = 1; key < 120 && 1 + key / 8 < size; key++) {
+    for (uint8_t key = 1; key < 112 && 1 + key / 8 < size; key++) {
         if (now_bit_report[1 + key / 8] & (1U << (key % 8))) {
             /* Keep held bitmap keys on that endpoint. Moving them back
                would release them before the following byte report arrives. */
@@ -656,16 +671,11 @@ void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t re
         if (queue_count == RF_QUEUE_SIZE) {
             /* Bounded outage: sacrifice old transitions, keep current states
                for every endpoint so a lost release cannot leave a key held. */
-            queue_head = 0;
-            queue_count = 5;
-            for (uint8_t i = 0; i < 5; i++) {
-                rf_queue[i].type = CMD_RPT_MS + i;
-                rf_queue[i].size = report_sizes[i];
-                memcpy(rf_queue[i].data, latest_reports[i], report_sizes[i]);
-            }
+            rf_queue_resync();
             return;
         }
         uint8_t tail = (queue_head + queue_count) % RF_QUEUE_SIZE;
+        rf_queue[tail].captured_at = timer_read32();
         rf_queue[tail].type = report_type;
         rf_queue[tail].size = report_size;
         memcpy(rf_queue[tail].data, report_buf, report_size);
@@ -697,8 +707,12 @@ void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t re
 
 /* Drain one report per interval, retaining order across newly arriving input. */
 static void rf_replay_task(void) {
-    if (f_rf_reset || rf_recovering || f_wakeup_prepare || f_goto_sleep || !queue_count || timer_elapsed32(replay_timer) < 8) return;
+    /* Allow faster catch-up on the dongle's 1ms USB polling path while
+       retaining Bluetooth pacing. One report per call, never a burst loop. */
+    uint8_t interval = dev_info.link_mode == LINK_RF_24 ? 2 : 8;
+    if (f_rf_reset || rf_recovering || f_wakeup_prepare || f_goto_sleep || !queue_count || timer_elapsed32(replay_timer) < interval) return;
     if (dev_info.link_mode == LINK_USB || dev_info.rf_state != RF_CONNECT) return;
+    if (timer_elapsed32(rf_queue[queue_head].captured_at) >= RF_REPLAY_MAX_AGE_MS) rf_queue_resync();
     replay_timer = timer_read32();
     uint8_t size = rf_queue[queue_head].size;
     uint8_t frame[21] = {UART_HEAD, rf_queue[queue_head].type, 1, size};

@@ -90,20 +90,77 @@ int main(void){
  before=tx_count;rf_replay_task();assert(tx_count==before+1 && tx[before][6]==4);
  rf_replay_task();assert(tx_count==before+1);
  now+=8;rf_replay_task();assert(tx_count==before+2 && tx[before+1][6]==0 && !queue_count);
+ // 2.4GHz recovery drains promptly, but never emits a same-tick burst.
+ // Bluetooth retains its existing eight-millisecond pacing.
+ for(unsigned mode=LINK_RF_24;mode<=LINK_BT_3;mode++){
+  rf_reset_sync_lost();dev_info.link_mode=mode;dev_info.rf_state=RF_CONNECT;
+  f_rf_reset=true;uart_send_report(CMD_RPT_BYTE_KB,press,8);
+  uart_send_report(CMD_RPT_BYTE_KB,release,8);f_rf_reset=false;
+  now+=8;before=tx_count;rf_replay_task();assert(tx_count==before+1);
+  unsigned interval=mode==LINK_RF_24?2:8;
+  for(unsigned tick=1;tick<interval;tick++){now++;rf_replay_task();assert(tx_count==before+1);}
+  now++;rf_replay_task();assert(tx_count==before+2 && !queue_count);
+ }
+ dev_info.link_mode=LINK_RF_24;
+ // New input arriving during replay follows the backlog in order.
+ rf_reset_sync_lost();f_rf_reset=true;now+=20;before=tx_count;
+ uart_send_report(CMD_RPT_BYTE_KB,press,8);f_rf_reset=false;
+ rf_replay_task();assert(tx_count==before+1);
+ // Queue another press/release pair while recovery is active, then append input.
+ f_rf_reset=true;uart_send_report(CMD_RPT_BYTE_KB,release,8);f_rf_reset=false;
+ uart_send_report(CMD_RPT_BYTE_KB,press,8);
+ uart_send_report(CMD_RPT_BYTE_KB,release,8);
+ for(unsigned i=0;i<3;i++){now+=2;rf_replay_task();}
+ assert(!queue_count && tx_count==before+4);
+ assert(tx[before][6]==4 && tx[before+1][6]==0 && tx[before+2][6]==4 && tx[before+3][6]==0);
+ // With no recovery backlog, normal input does not wait for a replay tick.
+ before=tx_count;uart_send_report(CMD_RPT_BYTE_KB,press,8);
+ uart_send_report(CMD_RPT_BYTE_KB,release,8);assert(tx_count==before+2);
  // Reconnect never renames the dongle or waits for that command's ACK.
  now+=200;delay_count=0;before=tx_count;dev_sts_sync();assert(delay_count==0);
  for(unsigned i=before;i<tx_count;i++)assert(tx[i][1]!=CMD_SET_24G_NAME);
  // Channel change cancels replay and a pending reset.
  f_rf_reset=true;uart_send_report(CMD_RPT_BYTE_KB,press,8);
  rf_reset_sync_lost();assert(!queue_count && !f_rf_reset && !rf_recovering);
+ // Rapid repeated and alternating taps must survive a 400ms recovery.
+ for(unsigned alternating=0;alternating<2;alternating++){
+  rf_reset_sync_lost();f_rf_reset=true;before=tx_count;
+  for(unsigned tap=0;tap<20;tap++){
+   press[2]=4+(alternating ? tap%2 : 0);
+   uart_send_report(CMD_RPT_BYTE_KB,press,8);now+=10;
+   uart_send_report(CMD_RPT_BYTE_KB,release,8);now+=10;
+  }
+  assert(queue_count==40 && tx_count==before);
+  f_rf_reset=false;dev_info.rf_state=RF_CONNECT;
+  unsigned replay_start=now;
+  while(queue_count){now+=2;rf_replay_task();}
+  assert(now-replay_start==80);
+  assert(tx_count==before+40);
+  for(unsigned tap=0;tap<20;tap++){
+   assert(tx[before+2*tap][6]==4+(alternating ? tap%2 : 0));
+   assert(tx[before+2*tap+1][6]==0);
+  }
+ }
+ press[2]=4;
  // Overflow resynchronizes all endpoints instead of leaving an old release lost.
  f_rf_reset=true;
- for(unsigned i=0;i<40;i++)uart_send_report(CMD_RPT_BYTE_KB,i%2?release:press,8);
+ for(unsigned i=0;i<RF_QUEUE_SIZE+8;i++)uart_send_report(CMD_RPT_BYTE_KB,i%2?release:press,8);
  assert(queue_count<RF_QUEUE_SIZE);
  assert(latest_reports[CMD_RPT_BYTE_KB-CMD_RPT_MS][2]==0);
  f_rf_reset=false;rf_recovering=false;dev_info.rf_state=RF_CONNECT;
  while(queue_count){now+=8;rf_replay_task();}
  assert(tx[tx_count-1][6]==0);
+ // Expired taps must not appear later, while held keys must survive resync.
+ for(unsigned held=0;held<2;held++){
+  rf_reset_sync_lost();f_rf_reset=true;
+  uart_send_report(CMD_RPT_BYTE_KB,press,8);
+  if(!held)uart_send_report(CMD_RPT_BYTE_KB,release,8);
+  now+=60000;f_rf_reset=false;before=tx_count;
+  while(queue_count){now+=8;rf_replay_task();}
+  bool found=false;
+  for(unsigned i=before;i<tx_count;i++)if(tx[i][1]==CMD_RPT_BYTE_KB){assert(tx[i][6]==(held?4:0));found=true;}
+  assert(found);
+ }
  puts("Transport passed: parser gaps, command ACKs, suspend ownership, sleep, reset press/release replay, pacing, reconnect, channel cancellation, overflow");
 }
 '''

@@ -14,7 +14,7 @@ jobs:
       run: sudo apt-get update -qq && sudo apt-get install -y cppcheck
     - name: Run cppcheck
       run: |
-        cppcheck --enable=warning,style,performance,portability \
+        cppcheck --enable=warning,performance,portability --error-exitcode=1 \
           --suppress=missingInclude --suppress=unusedFunction \
           --suppress=normalCheckLevelMaxBranches \
           --suppress=unmatchedSuppression \
@@ -28,6 +28,8 @@ jobs:
     - name: Clone submodule dependencies
       run: |
         git clone --depth 1 https://github.com/qmk/ChibiOS lib/chibios
+        git -C lib/chibios fetch --depth 1 origin b95228cc3ac7ac4e7e8ae5a4a076c316905e032d
+        git -C lib/chibios checkout b95228cc3ac7ac4e7e8ae5a4a076c316905e032d
         git clone --depth 1 https://github.com/qmk/ChibiOS-Contrib lib/chibios-contrib
         git clone --depth 1 https://github.com/qmk/lufa lib/lufa
         git clone --depth 1 https://github.com/qmk/v-usb lib/vusb
@@ -41,13 +43,5 @@ jobs:
         python3 -m pip install qmk
     - name: Generate compile database
       run: qmk generate-compilation-database -kb air96_v2/ansi -km default
-    - name: Run clang-tidy (advisory)
-      run: |
-        clang-tidy -p compile_commands.json \
-          --checks='-*,bugprone-*,readability-braces-around-statements,readability-redundant-declaration,readability-implicit-bool-conversion,misc-use-internal-linkage' \
-          --header-filter='keyboards/air96_v2/ansi/.*' \
-          keyboards/air96_v2/ansi/ansi.c \
-          keyboards/air96_v2/ansi/rf.c \
-          keyboards/air96_v2/ansi/side.c \
-          keyboards/air96_v2/ansi/sleep.c \
-          2>&1 | head -200 || true
+    - name: Run clang-tidy correctness checks
+      run: python3 util/lint_air96.py

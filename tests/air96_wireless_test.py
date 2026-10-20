@@ -46,7 +46,8 @@ bool f_goto_sleep,f_wakeup_prepare,f_send_channel,f_rf_sw_press,waiting_ack,rf_r
 uint8_t pending_cmd,reset_phase;
 uint8_t sync_lost,func_tab[32],rf_sw_temp,rf_sw_press_delay,host_mode;
 uint16_t no_act_time,rf_linking_time,rf_link_show_time;
-uint32_t rf_disconnect_time,now;
+uint32_t rf_disconnect_time,now,numlock_settle_start;
+uint8_t numlock_phase;
 int rf_host_driver,*m_host_driver;
 unsigned clears,clear_mode,report_key,command,downs,logical_keys,logical_mods,rows[6];
 struct {bool sleep_enable;} user_config={true};
@@ -66,7 +67,8 @@ unsigned has_anykey(void){return logical_keys;}
 unsigned has_anymod(void){return logical_mods;}
 unsigned matrix_get_row(unsigned r){return rows[r];}
 void usb_lld_wakeup_host(void *p){(void)p;}
-void usbWakeupHost(void *p){(void)p;}
+unsigned wakes;
+void usbWakeupHost(void *p){(void)p;wakes++;}
 void restart_usb_driver(void *p){(void)p;}
 '''
 code += between(rf, "static void RF_Protocol_Receive(void) {", "/**\n * @brief  Uart send cmd.")
@@ -75,6 +77,20 @@ code += between(ansi, "static void long_press_key(void)\n", "    if (f_dev_reset
 code += "bool handle(uint16_t keycode,keyrecord_t *record){switch(keycode){\n"
 code += between(ansi, "        case LNK_RF:", "        case MAC_TASK:")
 code += "default:return true;}}\n"
+code += r"""
+#define DEV_MODE_PIN 10
+#define SYS_MODE_PIN 11
+#define SYS_SW_MAC 0
+#define SYS_SW_WIN 1
+bool f_dial_sw_init_ok=true,f_sys_show;
+struct {bool nkro;} keymap_config;
+unsigned pins;
+void setPinInputHigh(unsigned p){(void)p;}
+unsigned readPin(unsigned p){return pins & (p==10?1:2);}
+void default_layer_set(unsigned l){(void)l;}
+"""
+code += between(ansi, "static void dial_sw_scan(void)\n", "/**\n * @brief  power on scan dial switch.")
+code += between(ansi, "static void m_power_on_dial_sw_scan(void)\n", "/* Shortcuts borrow")
 code += sleep[sleep.index("void Sleep_Handle(void) {"):]
 code += r'''
 static void frame(unsigned n,unsigned cmd){
@@ -82,6 +98,23 @@ static void frame(unsigned n,unsigned cmd){
     f_uart_ack=false;sync_lost=9;waiting_ack=true;pending_cmd=cmd;
 }
 int main(void){
+    // Contact bounce must not clear held input or suppress report delivery.
+    dev_info.link_mode=LINK_BT_1;dev_info.rf_channel=LINK_BT_1;
+    unsigned initial_clears=clears;
+    for(unsigned i=0;i<10;i++){pins=i%2;now+=20;dial_sw_scan();assert(f_dial_sw_init_ok && clears==initial_clears);}
+    pins=0;for(unsigned i=0;i<30;i++){now+=20;dial_sw_scan();assert(f_dial_sw_init_ok);}
+    // Both OS layouts retain NKRO after a stable physical switch change.
+    for(unsigned mode=0;mode<2;mode++){
+        pins=mode?2:0;keymap_config.nkro=false;
+        dev_info.sys_sw_state=mode?SYS_SW_WIN:SYS_SW_MAC;
+        for(unsigned i=0;i<30;i++){now+=20;dial_sw_scan();}
+        assert(keymap_config.nkro);
+    }
+    for(unsigned mode=0;mode<2;mode++){
+        pins=mode?2:0;keymap_config.nkro=false;
+        dev_info.sys_sw_state=mode?SYS_SW_WIN:SYS_SW_MAC;
+        m_power_on_dial_sw_scan();assert(keymap_config.nkro);
+    }
     // Invalid traffic must not acknowledge a command or postpone recovery.
     frame(6,CMD_HAND);RX_LEN=1;Usart_Mgr.RXDBuf[4]=1;Usart_Mgr.RXDBuf[5]=2;
     RF_Protocol_Receive();assert(!f_uart_ack && sync_lost==9 && !f_rf_hand_ok);
@@ -131,6 +164,11 @@ int main(void){
     f_wakeup_prepare=false;dev_info.link_mode=LINK_USB;USB_DRIVER.state=USB_SUSPENDED;
     rows[0]=1;no_act_time=100;f_goto_sleep=true;unsigned before=downs;
     now+=100;Sleep_Handle();assert(downs>before); // USB suspend is not vetoed
+    // Local USB wake returns immediately; host resume never signals wake again.
+    USB_DRIVER.status=2;no_act_time=0;f_wakeup_prepare=true;now+=100;
+    unsigned start=now;Sleep_Handle();assert(now==start && wakes==1);
+    USB_DRIVER.state=0;no_act_time=100;f_wakeup_prepare=true;now+=100;
+    start=now;Sleep_Handle();assert(now==start && wakes==1);
     puts("Wireless regressions passed: invalid frames, short ACKs, status, all channels, pairing, held-key sleep, USB suspend");
 }
 '''
