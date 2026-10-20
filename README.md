@@ -1,11 +1,13 @@
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.2.1-blue.svg?style=for-the-badge" alt="Version"/></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.2.4-blue.svg?style=for-the-badge" alt="Version"/></a>
   <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-green.svg?style=for-the-badge" alt="License"/></a>
   <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
 </p>
 
 # ⌨️ Air96 V2 — NuPhy QMK Firmware
+
+Current source version: **v3.2.4**. See [release notes](CHANGELOG.md#v324-2026-10-20).
 
 Welcome to the high-performance QMK firmware optimization fork for the **NuPhy Air96 V2** wireless mechanical keyboard. This repository is dedicated to pushing the performance, latency, and power-efficiency boundaries of the Air96 V2 hardware.
 
@@ -21,14 +23,14 @@ Binary output: `air96_v2_ansi_default.bin`
 
 ## ⚡ Flash
 
-📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.3.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.1/air96-v2-c-v3.2.3.bin)**
+📥 **[Download Pre-compiled Release Firmware (air96-v2-c-v3.2.4.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.4/air96-v2-c-v3.2.4.bin)**
 
 Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
 
 ### 🐧 Linux
 Install `dfu-util` via your package manager (e.g. `sudo apt install dfu-util` or `sudo pacman -S dfu-util`), then run:
 ```bash
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.3.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.4.bin
 ```
 *Note: You may need `sudo` or to configure [QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules) to flash without root privileges.*
 
@@ -36,7 +38,7 @@ dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.3.bin
 Install `dfu-util` via Homebrew:
 ```bash
 brew install dfu-util
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.3.bin
+dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.4.bin
 ```
 Alternatively, you can download and use the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
 

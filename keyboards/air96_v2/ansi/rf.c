@@ -58,65 +58,44 @@ uint16_t       host_last_consumer_usage(void);
 bool f_bit_kb_act = false;
 static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *now_bit_report, uint8_t size)
 {
-    uint8_t byte_index;
-    uint8_t offset_mask;
-    uint8_t key_code = 0;
-    bool f_byte_send = false;
-    bool f_bit_send = false;
+    /* The NRF bitmap has 15 key bytes. Keep higher usages in the six
+       byte slots, moving bitmap-capable keys out of their way as needed. */
+    uint8_t next_byte[8] = {now_bit_report[0], 0};
+    uint8_t next_bit[16] = {now_bit_report[0]};
+    uint8_t slot = 2;
+    (void)pre_bit_report;
 
-    uart_bit_report_buf[0] = now_bit_report[0];
-
-    if (pre_bit_report[0] ^ now_bit_report[0]) {
-        bytekb_report_buf[0] = now_bit_report[0];
-        f_byte_send          = true;
-        if (f_bit_kb_act) {
-            f_bit_send = true;
+    for (uint16_t key = 120; key < (size - 1) * 8; key++) {
+        if ((now_bit_report[1 + key / 8] & (1U << (key % 8))) && slot < 8) {
+            next_byte[slot++] = key;
         }
     }
-
-    for (uint8_t i = 1; i < size; i++) {
-        uint8_t change_mask = pre_bit_report[i] ^ now_bit_report[i];
-        offset_mask = 1;
-        for (uint8_t j = 0; j < 8; j++) {
-            if (change_mask & offset_mask) {
-                if (now_bit_report[i] & offset_mask) {
-                    for (byte_index = 2; byte_index < 8; byte_index++) {
-                        if (bytekb_report_buf[byte_index] == 0) {
-                            bytekb_report_buf[byte_index] = key_code;
-                            f_byte_send                   = true;
-                            break;
-                        }
-                    }
-                    if (byte_index >= 8) {
-                        uart_bit_report_buf[i] |= offset_mask;
-                        f_bit_send = true;
-                    }
-                } else {
-                    for (byte_index = 2; byte_index < 8; byte_index++) {
-                        if (bytekb_report_buf[byte_index] == key_code) {
-                            bytekb_report_buf[byte_index] = 0;
-                            f_byte_send                   = true;
-                            break;
-                        }
-                    }
-                    if (byte_index >= 8) {
-                        uart_bit_report_buf[i] &= ~offset_mask;
-                        f_bit_send = true;
-                    }
-                }
+    for (uint8_t key = 1; key < 120 && 1 + key / 8 < size; key++) {
+        if (now_bit_report[1 + key / 8] & (1U << (key % 8))) {
+            /* Keep held bitmap keys on that endpoint. Moving them back
+               would release them before the following byte report arrives. */
+            if (slot < 8 && !(uart_bit_report_buf[1 + key / 8] & (1U << (key % 8)))) {
+                next_byte[slot++] = key;
+            } else {
+                next_bit[1 + key / 8] |= 1U << (key % 8);
             }
-            key_code++;
-            offset_mask <<= 1;
         }
     }
+
+    bool f_byte_send = memcmp(bytekb_report_buf, next_byte, sizeof(next_byte)) != 0;
+    bool f_bit_send = memcmp(uart_bit_report_buf + 1, next_bit + 1, sizeof(next_bit) - 1) != 0 ||
+                      (f_bit_kb_act && uart_bit_report_buf[0] != next_bit[0]);
+    memcpy(bytekb_report_buf, next_byte, sizeof(next_byte));
+    memcpy(uart_bit_report_buf, next_bit, sizeof(next_bit));
 
     if (f_bit_send) {
+        /* Retain through idle so modifier changes and release retries reach
+           the bitmap endpoint until m_break_all_key() clears both reports. */
         f_bit_kb_act = true;
-        uart_send_report(CMD_RPT_BIT_KB, uart_bit_report_buf, 16);
+        uart_send_report(CMD_RPT_BIT_KB, uart_bit_report_buf, sizeof(next_bit));
     }
-
     if (f_byte_send) {
-        uart_send_report(CMD_RPT_BYTE_KB, bytekb_report_buf, 8);
+        uart_send_report(CMD_RPT_BYTE_KB, bytekb_report_buf, sizeof(next_byte));
     }
 }
 
@@ -138,9 +117,6 @@ void uart_send_report_func(void)
 
             if(f_bit_kb_act)
             uart_send_report(CMD_RPT_BIT_KB, uart_bit_report_buf, 16);
-        }
-        else {
-            f_bit_kb_act = 0;
         }
     }
 }
@@ -466,6 +442,36 @@ void dev_sts_sync(void) {
     static uint8_t  reset_cooldown      = 0;
     static uint8_t  usb_sync_prescaler  = 0;
 
+    static uint8_t  reset_phase = 0;
+    static uint32_t reset_timer = 0;
+
+    /* Service every scan, before the 200ms status throttle. Keep the original
+       reset pulse/settling times without blocking keyboard scanning. */
+    if (reset_phase == 0 && f_rf_reset) {
+        f_rf_reset = false;
+        reset_phase = 1;
+        reset_timer = timer_read32();
+    }
+    if (reset_phase != 0) {
+        if (timer_elapsed32(reset_timer) < (reset_phase == 1 ? 100 : 50)) {
+            return;
+        }
+        reset_timer = timer_read32();
+        if (reset_phase == 1) {
+            writePinLow(NRF_RESET_PIN);
+            reset_phase = 2;
+        } else if (reset_phase == 2) {
+            writePinHigh(NRF_RESET_PIN);
+            reset_phase = 3;
+        } else {
+            reset_phase = 0;
+            reset_cooldown = 3;
+            sync_lost = 0;
+            interval_timer = timer_read32();
+        }
+        return;
+    }
+
     if (timer_elapsed32(interval_timer) < 200) {
         return;
     }
@@ -476,16 +482,7 @@ void dev_sts_sync(void) {
         reset_cooldown--;
     }
 
-    if (f_rf_reset) {
-        f_rf_reset = false;
-        wait_ms(100);
-        writePinLow(NRF_RESET_PIN);
-        wait_ms(50);
-        writePinHigh(NRF_RESET_PIN);
-        wait_ms(50);
-        reset_cooldown = 3;  /* ~600ms cooldown (3 × 200ms intervals) */
-    }
-    else if (f_send_channel) {
+    if (f_send_channel) {
         f_send_channel = false;
         link_state_temp = RF_DISCONNECT;
         uart_send_cmd(CMD_SET_LINK, 10, 5);

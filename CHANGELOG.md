@@ -2,6 +2,15 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.4 (2026-10-20)
+*Wireless responsiveness and rollover fixes.*
+
+- **Nonblocking radio reset**: Preserve the radio reset timing while allowing keyboard scanning between reset steps, removing the 200 ms main-loop stall.
+- **Modifier tracking after idle**: Retain wireless bitmap tracking so modifier changes still update held overflow keys after an idle period.
+- **Higher keycodes during rollover**: Reserve the six byte-report slots for keycodes outside the radio bitmap range. Keep held bitmap keys on their endpoint to avoid false releases during report transitions. The existing protocol still limits simultaneous higher keycodes to six.
+- **Regression coverage**: Add host-compiled checks for report contents, idle modifiers, releases, overflow recovery, and reset timing, and run them in build CI.
+- **Validation**: Default and VIA builds and regression checks pass. Physical latency and delivery during a radio reboot remain unverified.
+
 ## v3.2.3 (2026-06-02)
 *Incremental I2C flush — eliminates keystroke hiccups during rapid typing.*
 
