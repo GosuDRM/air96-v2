@@ -75,6 +75,7 @@ void dev_sts_sync(void);
 void uart_send_report_func(void);
 void uart_receive_pro(void);
 void Sleep_Handle(void);
+static void switch_dev_link(uint8_t mode);
 uint8_t uart_send_cmd(uint8_t cmd, uint8_t ack_cnt, uint8_t delayms);
 void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t report_size);
 
@@ -146,7 +147,8 @@ static void long_press_key(void)
         if (rf_sw_press_delay >= RF_LONG_PRESS_DELAY)
         {
             f_rf_sw_press = false;
-            dev_info.link_mode   = rf_sw_temp;
+            switch_dev_link(rf_sw_temp);
+            f_send_channel = false; /* Pair below; do not queue a normal link. */
             dev_info.rf_channel  = rf_sw_temp;
             dev_info.ble_channel = rf_sw_temp;
 
@@ -258,6 +260,7 @@ static void switch_dev_link(uint8_t mode)
     if (mode > LINK_USB) return;
     m_break_all_key();    
 
+    f_goto_sleep = false;
     dev_info.link_mode = mode; 
     dev_info.rf_state = RF_IDLE;
     rf_linking_time = 0;
@@ -444,7 +447,8 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 m_break_all_key();
             } else {
                 if (dev_info.link_mode != LINK_USB) {
-                    dev_info.link_mode = LINK_USB;
+                    switch_dev_link(LINK_USB);
+                    f_send_channel = false;
                     uart_send_cmd(CMD_SET_LINK, 10, 5);
                 }
                 rf_blink_cnt = 3;
@@ -470,7 +474,8 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                    (ch=1) even though the user already moved on to BLE2. */
                 f_rf_sw_press = 0;
                 if (rf_sw_press_delay < RF_LONG_PRESS_DELAY) {
-                    dev_info.link_mode   = ch;
+                    switch_dev_link(ch);
+                    f_send_channel = false; /* Send immediately below. */
                     dev_info.rf_channel  = ch;
                     dev_info.ble_channel = ch;
                     uart_send_cmd(CMD_SET_LINK, 10, 5);

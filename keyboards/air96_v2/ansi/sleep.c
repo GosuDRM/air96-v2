@@ -45,6 +45,20 @@ void Sleep_Handle(void) {
     }
     delay_step_timer = timer_read32();
 
+    /* A held key is activity even when no new press/release report occurs.
+       Include physical Fn keys and logically held keys (e.g. key lock).
+       USB suspend must still follow the host's power state. */
+    if (dev_info.link_mode != LINK_USB) {
+        bool held = has_anykey() || has_anymod();
+        for (uint8_t row = 0; row < MATRIX_ROWS && !held; row++) {
+            held = matrix_get_row(row) != 0;
+        }
+        if (held) {
+            no_act_time = 0;
+            f_goto_sleep = false;
+        }
+    }
+
     if (f_goto_sleep) {
         /* Guard: reject NRF sleep request when USB is active and not suspended */
         if (dev_info.link_mode == LINK_USB && USB_DRIVER.state != USB_SUSPENDED) {

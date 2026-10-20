@@ -2,6 +2,17 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.5 (2026-10-20)
+*Wireless recovery, input delivery, and protocol handling.*
+
+- Preserve ordered reports during radio reset in a 32-entry queue, replayed at 8 ms intervals after a connected status on the selected channel. Overflow resynchronizes current endpoint states; intermediate events can be lost during prolonged outages.
+- Cancel queued input on channel changes and clear the old host before short selection or long-press pairing.
+- Recover from stale partial UART frames even when new bytes are queued; reject oversized lengths immediately.
+- Validate packets before acknowledging them, match ACKs to the pending command, and prevent short ACKs from consuming stale payloads.
+- Remove blocking dongle-name updates on reconnect; suppress status polling and reset recovery during intentional sleep.
+- Restrict dongle suspend messages to 2.4 GHz mode. Held physical keys and logical keys/modifiers prevent wireless idle sleep, while USB suspend remains host-controlled.
+- Add transport-level host simulations alongside the report and wireless regression suites. Real receiver delivery, radio interference, and physical latency remain unverified.
+
 ## v3.2.4 (2026-10-20)
 *Wireless responsiveness and rollover fixes.*
 

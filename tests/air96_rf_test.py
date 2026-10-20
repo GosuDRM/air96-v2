@@ -30,7 +30,12 @@ unsigned no_act_time, keyboard_protocol, now, byte_sends, bit_sends, commands;
 unsigned pin_low, pin_high;
 uint8_t sync_lost, host_mode=HOST_RF_TYPE, rf_blink_cnt, disconnect_delay;
 uint16_t rf_link_show_time, rf_linking_time;
-bool f_rf_reset, f_send_channel;
+bool f_rf_reset, f_send_channel, f_wakeup_prepare, f_goto_sleep, rf_recovering;
+uint8_t reset_phase, queue_count;
+struct {uint8_t RXDLen,RXDState;} Usart_Mgr;
+#define RX_Idle 0
+#define RF_LINKING 2
+void rf_replay_task(void){}
 int rf_host_driver, *m_host_driver;
 struct {unsigned link_mode, rf_state;} dev_info={1, RF_CONNECT};
 uint32_t timer_read32(void){return now;}

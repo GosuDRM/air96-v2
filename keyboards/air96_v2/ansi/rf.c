@@ -39,8 +39,29 @@ extern uint16_t        no_act_time;
 extern volatile bool f_send_channel;
 extern volatile bool f_dial_sw_init_ok;
 
+/* Recovery reports belong to the channel on which they were captured. */
+static uint8_t reset_phase;
+static bool rf_recovering;
+static uint8_t pending_cmd;
+static bool waiting_ack;
+#define RF_QUEUE_SIZE 32
+static struct { uint8_t type, size, data[16]; } rf_queue[RF_QUEUE_SIZE];
+static uint8_t queue_head, queue_count;
+static uint8_t latest_reports[5][16];
+static const uint8_t report_sizes[5] = {5, 8, 16, 2, 2};
+static uint32_t replay_timer;
+static void rf_replay_task(void);
+
 void rf_reset_sync_lost(void) {
     sync_lost = 0;
+    f_rf_reset = false;
+    reset_phase = 0;
+    rf_recovering = false;
+    queue_head = queue_count = 0;
+    memset(latest_reports, 0, sizeof(latest_reports));
+    writePinHigh(NRF_RESET_PIN);
+    Usart_Mgr.RXDLen = 0;
+    Usart_Mgr.RXDState = RX_Idle;
 }
 
 report_mouse_t mousekey_get_report(void);
@@ -108,6 +129,10 @@ void uart_send_report_func(void)
     static uint32_t interval_timer = 0;
 
     if (dev_info.link_mode == LINK_USB) return;
+    if (f_rf_reset || rf_recovering || queue_count) {
+        rf_replay_task();
+        return;
+    }
     keyboard_protocol          = 1;
 
     if (timer_elapsed32(interval_timer) > 100) {
@@ -174,9 +199,6 @@ void uart_send_report_nkro(report_nkro_t *report) {
  */
 static void RF_Protocol_Receive(void) {
     if (Usart_Mgr.RXDState == RX_Done) {
-        f_uart_ack = true;
-        sync_lost = 0;
-
         if (Usart_Mgr.RXDLen > 4) {
             if ((Usart_Mgr.RXDLen - 5) != RX_LEN) {
                 return;
@@ -201,8 +223,8 @@ static void RF_Protocol_Receive(void) {
             }
         } else if (Usart_Mgr.RXDLen == 3) {
             if (Usart_Mgr.RXDBuf[2] == 0xA0) {
-                f_uart_ack = true;
-                sync_lost  = 0;
+                /* Short ACKs have no payload; do not reuse the last frame. */
+                RX_LEN = 0;
             }
             else {
                 return;
@@ -211,6 +233,10 @@ static void RF_Protocol_Receive(void) {
             return;
         }
 
+        /* Only validated frames acknowledge commands or refresh recovery. */
+        if (waiting_ack && RX_CMD == pending_cmd) f_uart_ack = true;
+        sync_lost = 0;
+
         switch (RX_CMD) {
             case CMD_HAND: {
                 f_rf_hand_ok = true;
@@ -218,7 +244,7 @@ static void RF_Protocol_Receive(void) {
             }
 
             case CMD_24G_SUSPEND: {
-                f_goto_sleep = true;
+                if (dev_info.link_mode == LINK_RF_24) f_goto_sleep = true;
                 break;
             }
 
@@ -235,6 +261,9 @@ static void RF_Protocol_Receive(void) {
                         error_cnt = 0;
 
                         dev_info.rf_state = Usart_Mgr.RXDBuf[5];
+                        if (reset_phase == 0 && !f_send_channel && dev_info.rf_state == RF_CONNECT) {
+                            rf_recovering = false;
+                        }
 
                         if ((dev_info.rf_state == RF_CONNECT) && ((Usart_Mgr.RXDBuf[6] & 0xf8) == 0)) {
                             dev_info.rf_led = Usart_Mgr.RXDBuf[6];
@@ -300,6 +329,8 @@ static void RF_Protocol_Receive(void) {
  */
 uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
     if (delayms) wait_ms(delayms);
+    /* Drain old replies before changing the selected command's state. */
+    uart_receive_pro();
 
     Usart_Mgr.TXDBuf[0] = UART_HEAD;
     Usart_Mgr.TXDBuf[1] = cmd;
@@ -416,6 +447,8 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
         return TX_DATA_ERR;
     }
 
+    pending_cmd = cmd;
+    waiting_ack = wait_ack != 0;
     f_uart_ack = 0;
     Usart_Mgr.TXDBuf[4 + Usart_Mgr.TXDBuf[3]] = get_checksum(&Usart_Mgr.TXDBuf[4], Usart_Mgr.TXDBuf[3]);
     UART_Send_Bytes(Usart_Mgr.TXDBuf, Usart_Mgr.TXDBuf[3] + 5);
@@ -424,12 +457,16 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
         while (wait_ack--) {
             wait_ms(1);
             uart_receive_pro();
-            if (f_uart_ack) return TX_OK;
+            if (f_uart_ack) {
+                waiting_ack = false;
+                return TX_OK;
+            }
         }
     } else {
         return TX_OK;
     }
 
+    waiting_ack = false;
     return TX_TIMEOUT;
 }
 
@@ -442,14 +479,23 @@ void dev_sts_sync(void) {
     static uint8_t  reset_cooldown      = 0;
     static uint8_t  usb_sync_prescaler  = 0;
 
-    static uint8_t  reset_phase = 0;
     static uint32_t reset_timer = 0;
+
+    if (f_wakeup_prepare || f_goto_sleep) {
+        if (reset_phase) writePinHigh(NRF_RESET_PIN);
+        reset_phase = 0;
+        f_rf_reset = false;
+        sync_lost = 0;
+        interval_timer = timer_read32();
+        return;
+    }
 
     /* Service every scan, before the 200ms status throttle. Keep the original
        reset pulse/settling times without blocking keyboard scanning. */
     if (reset_phase == 0 && f_rf_reset) {
         f_rf_reset = false;
         reset_phase = 1;
+        rf_recovering = true;
         reset_timer = timer_read32();
     }
     if (reset_phase != 0) {
@@ -466,6 +512,10 @@ void dev_sts_sync(void) {
         } else {
             reset_phase = 0;
             reset_cooldown = 3;
+            dev_info.rf_state = RF_LINKING;
+            f_send_channel = true;
+            Usart_Mgr.RXDLen = 0;
+            Usart_Mgr.RXDState = RX_Idle;
             sync_lost = 0;
             interval_timer = timer_read32();
         }
@@ -483,9 +533,9 @@ void dev_sts_sync(void) {
     }
 
     if (f_send_channel) {
-        f_send_channel = false;
         link_state_temp = RF_DISCONNECT;
-        uart_send_cmd(CMD_SET_LINK, 10, 5);
+        uart_send_cmd(CMD_SET_LINK, 0, 0);
+        f_send_channel = false;
     }
 
     if (dev_info.link_mode == LINK_USB) {
@@ -522,9 +572,6 @@ void dev_sts_sync(void) {
             if (link_state_temp != RF_CONNECT) {
                 link_state_temp   = RF_CONNECT;
                 rf_link_show_time = 0;
-                if (dev_info.link_mode == LINK_RF_24) {
-                    uart_send_cmd(CMD_SET_24G_NAME, 10, 5);
-                }
             }
         }
     }
@@ -600,7 +647,31 @@ void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t re
     if (dev_info.link_mode == LINK_USB) {
         return;
     }
-    /* Let RF module handle its own state -- don't drop reports during pairing/linking. */
+    if (report_type < CMD_RPT_MS || report_type > CMD_RPT_SYS || report_size > 16) return;
+    uint8_t index = report_type - CMD_RPT_MS;
+    memcpy(latest_reports[index], report_buf, report_size);
+    /* Relative mouse movement must not be repeated during resynchronization. */
+    if (index == 0) memset(latest_reports[0] + 1, 0, 4);
+    if (f_rf_reset || rf_recovering || queue_count) {
+        if (queue_count == RF_QUEUE_SIZE) {
+            /* Bounded outage: sacrifice old transitions, keep current states
+               for every endpoint so a lost release cannot leave a key held. */
+            queue_head = 0;
+            queue_count = 5;
+            for (uint8_t i = 0; i < 5; i++) {
+                rf_queue[i].type = CMD_RPT_MS + i;
+                rf_queue[i].size = report_sizes[i];
+                memcpy(rf_queue[i].data, latest_reports[i], report_sizes[i]);
+            }
+            return;
+        }
+        uint8_t tail = (queue_head + queue_count) % RF_QUEUE_SIZE;
+        rf_queue[tail].type = report_type;
+        rf_queue[tail].size = report_size;
+        memcpy(rf_queue[tail].data, report_buf, report_size);
+        queue_count++;
+        return;
+    }
 
     /* If waking from sleep, power up RF module before sending the first report.
        Avoids the race where the report hits the UART before Sleep_Handle wakes the NRF.
@@ -624,6 +695,20 @@ void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t re
     UART_Send_Bytes(&Usart_Mgr.TXDBuf[0], report_size + 5);
 }
 
+/* Drain one report per interval, retaining order across newly arriving input. */
+static void rf_replay_task(void) {
+    if (f_rf_reset || rf_recovering || f_wakeup_prepare || f_goto_sleep || !queue_count || timer_elapsed32(replay_timer) < 8) return;
+    if (dev_info.link_mode == LINK_USB || dev_info.rf_state != RF_CONNECT) return;
+    replay_timer = timer_read32();
+    uint8_t size = rf_queue[queue_head].size;
+    uint8_t frame[21] = {UART_HEAD, rf_queue[queue_head].type, 1, size};
+    memcpy(frame + 4, rf_queue[queue_head].data, size);
+    frame[4 + size] = get_checksum(frame + 4, size);
+    UART_Send_Bytes(frame, size + 5);
+    queue_head = (queue_head + 1) % RF_QUEUE_SIZE;
+    queue_count--;
+}
+
 /**
  * @brief Uart receives data and processes it after completion,.
  */
@@ -633,12 +718,9 @@ void uart_receive_pro(void) {
     /* Timeout recovery: if we started receiving a packet but no new bytes
        arrive within 10ms, discard the partial packet and reset the parser.
        Prevents the parser from hanging on UART noise. */
-    if (Usart_Mgr.RXDLen > 0 && !uart_available()) {
-        if (timer_elapsed32(rx_timeout_timer) > 10) {
-            Usart_Mgr.RXDLen   = 0;
-            Usart_Mgr.RXDState = RX_Idle;
-        }
-        return;
+    if (Usart_Mgr.RXDLen > 0 && timer_elapsed32(rx_timeout_timer) > 10) {
+        Usart_Mgr.RXDLen = 0;
+        Usart_Mgr.RXDState = RX_Idle;
     }
 
     while (uart_available()) {
@@ -666,8 +748,13 @@ void uart_receive_pro(void) {
             }
         }
         else if (Usart_Mgr.RXDLen == 3) {
-            Usart_Mgr.RXDBuf[3] = b;
-            Usart_Mgr.RXDLen = 4;
+            if (b > UART_MAX_LEN - 5) {
+                Usart_Mgr.RXDLen = 0;
+                Usart_Mgr.RXDState = RX_Idle;
+            } else {
+                Usart_Mgr.RXDBuf[3] = b;
+                Usart_Mgr.RXDLen = 4;
+            }
         }
         else {
             if (Usart_Mgr.RXDLen < UART_MAX_LEN) {

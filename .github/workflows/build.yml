@@ -31,7 +31,10 @@ jobs:
         python3 -m pip install qmk
 
     - name: RF responsiveness regressions
-      run: python3 tests/air96_rf_test.py
+      run: |
+        python3 tests/air96_rf_test.py
+        python3 tests/air96_wireless_test.py
+        python3 tests/air96_transport_test.py
 
     - name: Compile Air96 V2
       run: qmk compile -kb air96_v2/ansi -km default
