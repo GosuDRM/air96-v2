@@ -43,5 +43,7 @@ jobs:
         python3 -m pip install qmk
     - name: Generate compile database
       run: qmk generate-compilation-database -kb air96_v2/ansi -km default
+    - name: Build generated headers
+      run: qmk compile -kb air96_v2/ansi -km default
     - name: Run clang-tidy correctness checks
       run: python3 util/lint_air96.py
