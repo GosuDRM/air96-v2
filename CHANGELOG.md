@@ -2,6 +2,20 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.8 (2026-11-07)
+*Immediate debounced presses, wireless wake and link-loss fixes, idle core during sleep.*
+
+- Give wireless key usages fixed report ownership: usages 1..111 use the bitmap interface and higher usages use the six byte slots. This prevents held keys becoming new presses when rollover previously moved them between receiver interfaces.
+- Model the dongle's two independent host keyboard interfaces in regression tests, covering B..G held while A and a higher usage are added and released. Wireless boot-only host compatibility is unverified; use wired USB for such hosts.
+
+- Buffer wireless wake input until the selected channel reports connected; let the sleep handler send one wake handshake instead of sending a handshake before each report.
+- Use 10ms asymmetric per-key debounce (`asym_eager_defer_pk`): presses report on the first contact scan, releases must be stable for 10ms. Rejects the same tested press/release chatter as deferred debounce without its ~10ms press delay; a single-scan noise glitch can now register as a press.
+- Reset the wireless link timer on wake. It kept counting while asleep, so waking after more than 120s tripped `LINK_TIMEOUT` and put the radio back to sleep mid-reconnect.
+- Queue wireless reports while the selected link is idle, linking or disconnected (channel switch, link loss), replaying them once connected instead of sending them to a module that drops them. The existing 1s replay age limit still applies.
+- Shorten the UART wake-pin hold from 32us to 24us per byte to match 11-bit frames at 460800 baud (~0.17ms less blocking per NKRO frame).
+- Halt the core with WFI during `wait_ms()` and idle it 10ms per loop during wireless sleep, instead of scanning at full speed. Power draw not measured.
+- Add combined sleep/transport regressions for Bluetooth and 2.4 GHz and a production-debounce regression for first-contact chatter after idle. Physical keyboard delivery remains unverified.
+
 ## v3.2.7 (2026-10-20)
 *Input responsiveness, dongle compatibility, and runtime hardening.*
 

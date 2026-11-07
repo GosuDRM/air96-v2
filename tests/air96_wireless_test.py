@@ -59,6 +59,7 @@ void m_break_all_key(void){clears++;clear_mode=dev_info.link_mode;report_key=0;}
 void rf_reset_sync_lost(void){sync_lost=0;}
 void host_set_driver(int *p){(void)p;}
 uint8_t uart_send_cmd(uint8_t c,uint8_t a,uint8_t d){(void)a;(void)d;command=c;return 0;}
+void rf_wake(void){rf_recovering=true;command=CMD_HAND;}
 void uart_receive_pro(void){}
 void wait_ms(unsigned n){now+=n;}
 void writePinLow(unsigned p){(void)p;downs++;}

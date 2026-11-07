@@ -54,6 +54,11 @@ static const uint8_t report_sizes[5] = {5, 8, 16, 2, 2};
 static uint32_t replay_timer;
 static void rf_replay_task(void);
 
+/* Link setup or loss: the module would drop reports, so queue them for replay. */
+static bool rf_link_down(void) {
+    return dev_info.rf_state == RF_IDLE || dev_info.rf_state == RF_LINKING || dev_info.rf_state == RF_DISCONNECT;
+}
+
 /* Old taps expire; current states still release any keys held by the host. */
 static void rf_queue_resync(void) {
     queue_head = 0;
@@ -95,7 +100,9 @@ static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *no
 {
     /* The dongle HID descriptor exposes usages 0..111. The UART frame
        remains 16 bytes; reserve its unused last bitmap byte as zero.
-       Keep higher usages in the six byte slots. */
+       Give each usage a fixed endpoint: bitmap for 1..111, byte slots for
+       higher usages. Moving a held key between the dongle's independent
+       keyboard interfaces can generate a second press on the host. */
     uint8_t next_byte[8] = {now_bit_report[0], 0};
     uint8_t next_bit[16] = {now_bit_report[0]};
     uint8_t slot = 2;
@@ -108,13 +115,7 @@ static void uart_auto_nkey_send(const uint8_t *pre_bit_report, const uint8_t *no
     }
     for (uint8_t key = 1; key < 112 && 1 + key / 8 < size; key++) {
         if (now_bit_report[1 + key / 8] & (1U << (key % 8))) {
-            /* Keep held bitmap keys on that endpoint. Moving them back
-               would release them before the following byte report arrives. */
-            if (slot < 8 && !(uart_bit_report_buf[1 + key / 8] & (1U << (key % 8)))) {
-                next_byte[slot++] = key;
-            } else {
-                next_bit[1 + key / 8] |= 1U << (key % 8);
-            }
+            next_bit[1 + key / 8] |= 1U << (key % 8);
         }
     }
 
@@ -143,8 +144,8 @@ void uart_send_report_func(void)
 {
     static uint32_t interval_timer = 0;
 
-    if (dev_info.link_mode == LINK_USB) return;
-    if (f_rf_reset || rf_recovering || queue_count) {
+    if (dev_info.link_mode == LINK_USB || f_wakeup_prepare || f_goto_sleep) return;
+    if (f_rf_reset || rf_recovering || queue_count || rf_link_down()) {
         rf_replay_task();
         return;
     }
@@ -276,7 +277,7 @@ static void RF_Protocol_Receive(void) {
                         error_cnt = 0;
 
                         dev_info.rf_state = Usart_Mgr.RXDBuf[5];
-                        if (reset_phase == 0 && !f_send_channel && dev_info.rf_state == RF_CONNECT) {
+                        if (reset_phase == 0 && !f_send_channel && !f_wakeup_prepare && !f_goto_sleep && dev_info.rf_state == RF_CONNECT) {
                             rf_recovering = false;
                         }
 
@@ -485,6 +486,18 @@ uint8_t uart_send_cmd(uint8_t cmd, uint8_t wait_ack, uint8_t delayms) {
     return TX_TIMEOUT;
 }
 
+/* Sleep_Handle owns wakeup. Preserve transitions until the selected radio
+   channel reports connected, just as during reset recovery. */
+void rf_wake(void) {
+    /* rf_linking_time kept counting while asleep; a stale value would trip
+       LINK_TIMEOUT and re-sleep the module mid-reconnect. */
+    rf_linking_time = 0;
+    rf_recovering = true;
+    dev_info.rf_state = RF_LINKING;
+    uart_send_cmd(CMD_HAND, 0, 1);
+    uart_send_cmd(CMD_RF_STS_SYSC, 0, 0);
+}
+
 /**
  * @brief RF module state sync.
  */
@@ -625,7 +638,9 @@ static void UART_Send_Bytes(const uint8_t *Buffer, uint32_t Length) {
 
     uart_transmit(Buffer, Length);
 
-    wait_us(50 + Length * 32);
+    /* 11-bit frames (8 data + parity) at 460800 baud take 23.9us per byte;
+       the 128-byte TX queue (QMK halconf) means uart_transmit() returns at once. */
+    wait_us(50 + Length * 24);
     writePinHigh(NRF_WAKEUP_PIN);
 }
 
@@ -667,7 +682,7 @@ void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t re
     memcpy(latest_reports[index], report_buf, report_size);
     /* Relative mouse movement must not be repeated during resynchronization. */
     if (index == 0) memset(latest_reports[0] + 1, 0, 4);
-    if (f_rf_reset || rf_recovering || queue_count) {
+    if (f_rf_reset || rf_recovering || queue_count || f_wakeup_prepare || f_goto_sleep || rf_link_down()) {
         if (queue_count == RF_QUEUE_SIZE) {
             /* Bounded outage: sacrifice old transitions, keep current states
                for every endpoint so a lost release cannot leave a key held. */
@@ -681,17 +696,6 @@ void uart_send_report(uint8_t report_type, const uint8_t *report_buf, uint8_t re
         memcpy(rf_queue[tail].data, report_buf, report_size);
         queue_count++;
         return;
-    }
-
-    /* If waking from sleep, power up RF module before sending the first report.
-       Avoids the race where the report hits the UART before Sleep_Handle wakes the NRF.
-       Note: we do NOT clear f_wakeup_prepare here — Sleep_Handle() owns the full
-       wake sequence including USB wakeup signaling (fix for C3 race condition). */
-    if (f_wakeup_prepare) {
-        writePinHigh(DC_BOOST_PIN);
-        writePinHigh(RGB_DRIVER_SDB1);
-        writePinHigh(RGB_DRIVER_SDB2);
-        uart_send_cmd(CMD_HAND, 0, 1);
     }
 
     Usart_Mgr.TXDBuf[0] = UART_HEAD;

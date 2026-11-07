@@ -106,7 +106,11 @@ void Sleep_Handle(void) {
         writePinHigh(RGB_DRIVER_SDB1);
         writePinHigh(RGB_DRIVER_SDB2);
 
-        uart_send_cmd(CMD_HAND, 0, 1);
+        if (dev_info.link_mode == LINK_USB) {
+            uart_send_cmd(CMD_HAND, 0, 1);
+        } else {
+            rf_wake();
+        }
         /* Only flush key state on a host-driven wake. On a local key wake the
            keypress that triggered the wake is already in flight; clearing it
            here would release it mid-hold and corrupt the event. */

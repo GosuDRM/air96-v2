@@ -152,6 +152,8 @@ typedef struct
 #define HOST_BLE_TYPE     1
 #define HOST_RF_TYPE      2
 
+void rf_wake(void);
+
 #define LINK_TIMEOUT     (uint16_t)(100 * 120) 
 #define SLEEP_TIME_DELAY (uint16_t)(100 * 360)  
 #define POWER_DOWN_DELAY (uint16_t)(24)      

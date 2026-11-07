@@ -5,6 +5,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / "keyboards/air96_v2/ansi/rf.c").read_text()
+link_down = source[source.index("static bool rf_link_down"):source.index("/* Old taps expire")]
 reports = source[source.index("bool f_bit_kb_act"):source.index("/**\n * @brief  Uart send consumer")]
 reset = source[source.index("void dev_sts_sync(void)"):source.index("/**\n * @brief Uart send bytes.")]
 stubs = r"""
@@ -28,6 +29,8 @@ stubs = r"""
 uint8_t uart_bit_report_buf[31], bytekb_report_buf[8];
 unsigned no_act_time, keyboard_protocol, now, byte_sends, bit_sends, commands;
 unsigned pin_low, pin_high;
+bool host_keys[2][256];
+unsigned host_presses[256];
 uint8_t sync_lost, host_mode=HOST_RF_TYPE, rf_blink_cnt, disconnect_delay;
 uint16_t rf_link_show_time, rf_linking_time;
 bool f_rf_reset, f_send_channel, f_wakeup_prepare, f_goto_sleep, rf_recovering;
@@ -35,6 +38,7 @@ uint8_t reset_phase, queue_count;
 struct {uint8_t RXDLen,RXDState;} Usart_Mgr;
 #define RX_Idle 0
 #define RF_LINKING 2
+#define RF_IDLE 9
 void rf_replay_task(void){}
 int rf_host_driver, *m_host_driver;
 struct {unsigned link_mode, rf_state;} dev_info={1, RF_CONNECT};
@@ -46,7 +50,17 @@ void host_set_driver(int *p){(void)p;}
 void m_break_all_key(void){}
 void uart_send_cmd(unsigned c,unsigned a,unsigned d){(void)c;(void)a;(void)d;commands++;}
 void uart_send_report(uint8_t t,const uint8_t *b,uint8_t n){
-    (void)b;
+    bool next[256]={0};
+    unsigned endpoint=t==CMD_RPT_BYTE_KB?0:1;
+    if(endpoint==0){
+        for(unsigned i=2;i<8;i++)if(b[i])next[b[i]]=true;
+    }else{
+        for(unsigned k=1;k<112;k++)next[k]=(b[1+k/8]&(1U<<(k%8)))!=0;
+    }
+    for(unsigned k=1;k<256;k++){
+        if(next[k] && !host_keys[endpoint][k])host_presses[k]++;
+        host_keys[endpoint][k]=next[k];
+    }
     if(t==CMD_RPT_BYTE_KB){assert(n==8);byte_sends++;}
     else {assert(t==CMD_RPT_BIT_KB && n==16);bit_sends++;}
 }
@@ -64,8 +78,19 @@ static bool represented(unsigned k){
     return k<112 && (uart_bit_report_buf[1+k/8]&(1U<<(k%8)));
 }
 int main(void){
+    // The dongle exposes two independent keyboard interfaces. A held G must
+    // not become a new host press when A or a high usage joins B..G.
+    for(unsigned k=5;k<=10;k++)key(k,true);
+    key(4,true);key(135,true);
+    for(unsigned k=4;k<=10;k++)assert(host_presses[k]==1);
+    assert(host_presses[135]==1);
+    key(4,false);key(135,false);
+    for(unsigned k=5;k<=10;k++)assert(host_presses[k]==1);
+    for(unsigned k=5;k<=10;k++)key(k,false);
+    for(unsigned k=1;k<256;k++)assert(!host_keys[0][k] && !host_keys[1][k]);
+    byte_sends=bit_sends=0;
     for(unsigned k=4;k<=9;k++)key(k,true);
-    assert(bit_sends==0); // ordinary six-key typing keeps the byte format
+    assert(bit_sends==6 && byte_sends==0); // each ordinary key owns the bitmap endpoint
     // The receiver advertises usages 0..111, despite the 16-byte UART payload.
     key(111,true);assert(represented(111));key(111,false);
     for(unsigned k=112;k<120;k++){
@@ -109,6 +134,6 @@ int main(void){
 with tempfile.TemporaryDirectory(prefix="air96-rf-test-") as tmp:
     c = Path(tmp) / "test.c"
     exe = Path(tmp) / "test"
-    c.write_text(stubs + reports + reset + checks)
+    c.write_text(stubs + link_down + reports + reset + checks)
     subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", str(c), "-o", str(exe)], check=True)
     subprocess.run([str(exe)], check=True)

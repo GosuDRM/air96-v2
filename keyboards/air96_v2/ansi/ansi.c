@@ -740,6 +740,12 @@ void housekeeping_task_kb(void)
 
     m_side_led_show();
 
+    /* Wireless sleep: idle the core (WFI, see chconf.h) between scans. Adds at
+       most 10ms to the wake keypress, which then waits for the radio anyway. */
+    if (f_wakeup_prepare && dev_info.link_mode != LINK_USB) {
+        wait_ms(10);
+    }
+
     /* One-shot NumLock ON at boot. Wait 2s after USB enumeration for
        the host to settle, then require a 200ms idle window so the press
        can't land on top of the user's first keypresses (which was

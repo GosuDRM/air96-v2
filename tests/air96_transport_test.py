@@ -54,12 +54,51 @@ void uart_transmit(const uint8_t *p,uint16_t n){
  if(reply_mode && p[2]==0){rx_pos=0;rx_n=3;rx[0]=UART_HEAD;rx[1]=reply_mode==1?p[1]:CMD_RF_STS_SYSC;rx[2]=0xa0;}
 }
 '''
+# Exercise the real sleep owner together with the real RF queue and parser.
+stubs += r'''
+#define MATRIX_ROWS 1
+#define SLEEP_TIME_DELAY 36000
+#define LINK_TIMEOUT 12000
+#define USB_SUSPENDED 1
+#define USB_GETSTATUS_REMOTE_WAKEUP_ENABLED 2
+struct {unsigned state,status;} USB_DRIVER;
+struct {bool sleep_enable;} user_config={true};
+uint32_t rf_disconnect_time;
+unsigned has_anykey(void){return 0;}
+unsigned has_anymod(void){return 0;}
+unsigned matrix_get_row(unsigned r){(void)r;return 0;}
+void usbWakeupHost(void *p){(void)p;}
+'''
+sleep = (kb / 'sleep.c').read_text()
+source += sleep[sleep.index('void Sleep_Handle(void) {'):]
+
 checks = r'''
 static void feed(const uint8_t *p,unsigned n){memcpy(rx,p,n);rx_pos=0;rx_n=n;uart_receive_pro();}
 static void connected(void){
  uint8_t p[]={UART_HEAD,CMD_RF_STS_SYSC,0,5,LINK_RF_24,RF_CONNECT,0,0,70,73};feed(p,sizeof p);
 }
 int main(void){
+
+ // A complete wake tap survives until connection, with exactly one handshake.
+ for(unsigned mode=LINK_BT_1;mode<=LINK_RF_24;mode++){
+  dev_info.link_mode=mode;rf_reset_sync_lost();f_wakeup_prepare=true;
+  no_act_time=0;now+=100;unsigned start=tx_count;
+  uint8_t down[8]={0,0,4},up[8]={0};
+  uart_send_report(CMD_RPT_BYTE_KB,down,8);
+  uart_send_report(CMD_RPT_BYTE_KB,up,8);
+  uart_send_report_func();assert(tx_count==start && queue_count==2);
+  Sleep_Handle();assert(!f_wakeup_prepare && rf_recovering);
+  assert(tx_count==start+2 && tx[start][1]==CMD_HAND && tx[start+1][1]==CMD_RF_STS_SYSC);
+  now+=20;rf_replay_task();assert(tx_count==start+2);
+  uint8_t ack[]={UART_HEAD,CMD_HAND,0xa0};feed(ack,3);
+  rf_replay_task();assert(tx_count==start+2); // handshake alone is insufficient
+  uint8_t status[]={UART_HEAD,CMD_RF_STS_SYSC,0,5,mode,RF_CONNECT,0,0,70,0};
+  for(unsigned i=4;i<9;i++)status[9]+=status[i]; // RX checksum: plain sumfeed(status,sizeof status);
+  rf_replay_task();assert(tx_count==start+3 && tx[start+2][6]==4);
+  now+=8;rf_replay_task();assert(tx_count==start+4 && tx[start+3][6]==0 && !queue_count);
+  now+=100;Sleep_Handle();assert(tx_count==start+4); // no second wake handshake
+ }
+ rf_reset_sync_lost();tx_count=0;now=0;dev_info.link_mode=LINK_RF_24;
  // A queued late ACK must not extend an expired partial packet.
  uint8_t partial[]={UART_HEAD,CMD_RF_STS_SYSC,0,5};
  uint8_t ack[]={UART_HEAD,CMD_HAND,0xa0};
@@ -161,7 +200,29 @@ int main(void){
   for(unsigned i=before;i<tx_count;i++)if(tx[i][1]==CMD_RPT_BYTE_KB){assert(tx[i][6]==(held?4:0));found=true;}
   assert(found);
  }
- puts("Transport passed: parser gaps, command ACKs, suspend ownership, sleep, reset press/release replay, pacing, reconnect, channel cancellation, overflow");
+ // Waking after a sleep longer than LINK_TIMEOUT must not immediately re-sleep
+ // the module mid-reconnect (rf_linking_time kept counting while asleep).
+ rf_reset_sync_lost();dev_info.link_mode=LINK_BT_1;dev_info.rf_state=RF_CONNECT;
+ f_goto_sleep=false;f_wakeup_prepare=true;rf_linking_time=0xffff;no_act_time=0;
+ now+=100;before=tx_count;Sleep_Handle();
+ assert(!f_wakeup_prepare && !f_goto_sleep && dev_info.rf_state==RF_LINKING);
+ no_act_time=20;now+=50;Sleep_Handle();assert(!f_goto_sleep && !f_wakeup_prepare);
+ for(unsigned i=before;i<tx_count;i++)assert(tx[i][1]!=CMD_SLEEP && tx[i][1]!=CMD_SET_CONFIG);
+ // Input typed while a link is (re)establishing outside reset/wake is held
+ // for replay rather than sent to a module that would drop it.
+ for(unsigned state=0;state<3;state++){
+  static const uint8_t down_states[]={RF_IDLE,RF_LINKING,RF_DISCONNECT};
+  rf_reset_sync_lost();dev_info.link_mode=LINK_BT_1;dev_info.rf_state=down_states[state];
+  now+=100;before=tx_count;
+  uart_send_report(CMD_RPT_BYTE_KB,press,8);uart_send_report(CMD_RPT_BYTE_KB,release,8);
+  uart_send_report_func();assert(tx_count==before && queue_count==2);
+  uint8_t status[]={UART_HEAD,CMD_RF_STS_SYSC,0,5,LINK_BT_1,RF_CONNECT,0,0,70,0};
+  for(unsigned i=4;i<9;i++)status[9]+=status[i]; // RX checksum is a plain sum
+  feed(status,sizeof status);
+  now+=8;rf_replay_task();now+=8;rf_replay_task();
+  assert(!queue_count && tx_count==before+2 && tx[before][6]==4 && tx[before+1][6]==0);
+ }
+ puts("Transport passed: long-sleep wake, link-down buffering, parser gaps, command ACKs, suspend ownership, sleep, reset press/release replay, pacing, reconnect, channel cancellation, overflow");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='air96-transport-') as tmp:
