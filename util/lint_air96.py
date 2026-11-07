@@ -16,7 +16,8 @@ with tempfile.TemporaryDirectory(prefix='air96-clang-tidy-') as tmp:
     (Path(tmp) / 'compile_commands.json').write_text(json.dumps(entries))
     subprocess.run([
         'clang-tidy', '-p', tmp,
-        '--checks=-*,clang-analyzer-core.*,bugprone-sizeof-expression,bugprone-suspicious-memset-usage',
+        # MMIO register access (GPIOx->IDR, USARTx->CR1) is fixed-address by design.
+        '--checks=-*,clang-analyzer-core.*,-clang-analyzer-core.FixedAddressDereference,bugprone-sizeof-expression,bugprone-suspicious-memset-usage',
         '--warnings-as-errors=clang-analyzer-*,bugprone-*',
         '--header-filter=keyboards/air96_v2/ansi/.*',
         *[str(p) for p in sorted(Path('keyboards/air96_v2/ansi').glob('*.c'))],
