@@ -1,119 +1,81 @@
-<p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-v3.2.8-blue.svg?style=for-the-badge" alt="Version"/></a>
-  <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0-green.svg?style=for-the-badge" alt="License"/></a>
-  <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
-</p>
+# Air96 V2 QMK Firmware
 
-# ⌨️ Air96 V2 — NuPhy QMK Firmware
+QMK firmware for the NuPhy Air96 V2 (ANSI), based on NuPhy's QMK source with
+wireless, sleep and USB fixes. Only `keyboards/air96_v2/ansi` is maintained;
+the other keyboards were removed.
 
-Current source version: **v3.2.8**. See [release notes](CHANGELOG.md#v328-2026-11-07).
+[![Release](https://img.shields.io/github/v/release/GosuDRM/air96-v2)](https://github.com/GosuDRM/air96-v2/releases/latest)
+[![License](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 
-Welcome to the high-performance QMK firmware optimization fork for the **NuPhy Air96 V2** wireless mechanical keyboard. This repository is dedicated to pushing the performance, latency, and power-efficiency boundaries of the Air96 V2 hardware.
+Source version: **v3.2.9** ([CHANGELOG](CHANGELOG.md)). A Rust port lives at
+[air96-v2-rs](https://github.com/GosuDRM/air96-v2-rs).
 
-Only the `air96_v2/ansi` keyboard is maintained. All other keyboards have been removed to keep this repository focused, lightweight, and streamlined.
+## Flash
 
-## 🛠️ Build
+Download from [Releases](https://github.com/GosuDRM/air96-v2/releases):
+
+- `air96-v2-c-vX.Y.Z.bin`: default keymap
+- `air96-v2-via-vX.Y.Z.bin`: VIA keymap (edit the layout in VIA)
+
+Enter DFU mode: unplug the keyboard, hold **Esc**, plug it in (STM32 DFU,
+`0483:df11`). Like QMK bootmagic, this also clears saved settings.
+
+**Linux / macOS**: install `dfu-util` (`apt`, `pacman` or `brew`), then:
 
 ```bash
-qmk compile -kb air96_v2/ansi -km default
+dfu-util -d 0483:df11 -a 0 -s 0x08000000:leave -D air96-v2-c-vX.Y.Z.bin
 ```
 
-Binary output: `air96_v2_ansi_default.bin`
+On Linux, flashing without `sudo` needs the
+[QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules).
 
-## ⚡ Flash
+**Windows**: in [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases),
+select the `.bin`, set the MCU to `STM32F072`, tick **Auto-Flash**, then enter
+DFU mode.
 
-📥 **[Release Firmware (air96-v2-c-v3.2.8.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.8/air96-v2-c-v3.2.8.bin)**
+## Build
 
-Hold the **Escape** key while plugging in the USB cable to enter DFU mode, then follow the instructions for your operating system:
-
-### 🐧 Linux
-Install `dfu-util` via your package manager (e.g. `sudo apt install dfu-util` or `sudo pacman -S dfu-util`), then run:
 ```bash
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.8.bin
+qmk compile -kb air96_v2/ansi -km default   # or -km via
+for t in tests/air96_*_test.py; do python3 "$t"; done
 ```
-*Note: You may need `sudo` or to configure [QMK udev rules](https://docs.qmk.fm/faq_build#linux-udev-rules) to flash without root privileges.*
 
-### 🍎 macOS
-Install `dfu-util` via Homebrew:
-```bash
-brew install dfu-util
-dfu-util -d 0483:DF11 -a 0 -s 0x08000000:leave -D air96-v2-c-v3.2.8.bin
-```
-Alternatively, you can download and use the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
+Output: `air96_v2_ansi_default.bin` / `air96_v2_ansi_via.bin`. Pushing a `v*`
+tag runs the tests, builds both keymaps and publishes a release with that
+version's CHANGELOG section.
 
-### 🪟 Windows
-1. Download and run the graphical [QMK Toolbox](https://github.com/qmk/qmk_toolbox/releases).
-2. Select `air96_v2_ansi_default.bin` as the Local File.
-3. Set the Microcontroller to `STM32F072`.
-4. Check the **Auto-Flash** checkbox.
-5. Hold the **Escape** key and plug in the USB cable. The flashing process will start automatically.
+## Changes from NuPhy's firmware
 
-## 🌟 Highlights (v3.0.0 → v3.2.1)
+- NRF UART parsing no longer blocks waiting for ACKs; wireless startup takes
+  ~230 ms instead of up to 1250 ms.
+- Wireless reports are sent once instead of three times; keys pressed while
+  the radio wakes are held until the link connects.
+- LEDs and radio power down during USB suspend, even with auto-sleep off.
+- Debounce is QMK `asym_eager_defer_pk`, 10 ms: presses register at once,
+  releases need 10 ms stable (stock: 1 ms).
+- NumLock turns on after power-on, PC restart and wireless reconnect
+  (Windows mode).
+- Mac Spotlight/screenshot shortcuts take 5 ms instead of 50 ms and keep held
+  modifiers.
+- Fixes for sleep/wake lockups, mode-switch state leaks, LED flicker and UART
+  edge cases.
 
-This firmware has undergone extensive audit, bug-fixing, and performance hardening compared to the original base port. Below are the notable achievements across the **v3.x** branch:
+Full history: [CHANGELOG.md](CHANGELOG.md).
 
-* **🔄 Stability Overhaul (v3.2.0):**
-  Multi-pass audit fixing sleep/wake lockup, mode-switching state leaks, LED flicker, and UART protocol edge cases. NRF sleep requests are now rejected when USB is active, all sync counters reset on mode switch, battery indicator auto-dismisses after 10s, and key debounce was raised from 1ms to 5ms. Current source uses 10ms asymmetric per-key debounce: immediate presses, 10ms stable releases.
-* **⚡ Wake & Command Hardening:**
-  Solved a critical wait-for-ACK loop blocking issue in `rf.c`, restoring immediate, non-blocking serial parsing. Wireless startup dead-time has been slashed **5.4×** (1250ms → 230ms), and current source buffers wake-key transitions until the selected radio channel reports connected. Physical wake latency and delivery require hardware validation.
-* **🔋 Power Consumption & USB Compliance:**
-  Prescaled state synchronization checks in wired mode to save 2-3mA on battery. The sleep handler has been hardened to force LED and NRF power-downs during USB suspend even when auto-sleep is disabled, fully satisfying the USB suspend current draw limits (0.5mA / 2.5mA max).
-* **🧠 Layout & UX Refinements:**
-  Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
-* **🧹 Code Quality & Footprint Optimization:**
-  Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **limiting the final binary footprint to 56,862 bytes** (including all custom features).
-* **📜 Full Revision History:**
-  See [CHANGELOG.md](CHANGELOG.md) for the complete record of all engineering optimizations, bug fixes, and releases.
+## Wireless limitations
 
-### 📊 Performance & Optimization Summary
+- Each key usage has a fixed wireless report: usages 1–111 use the NKRO
+  bitmap, higher usages share six byte slots, so at most six higher usages can
+  be held at once. BIOS/boot-only hosts are untested over wireless; use USB
+  there.
+- The receiver declares interface 1 with `bNumEndpoints=1` but two endpoint
+  descriptors (Linux logs the mismatch). NuPhy's 2.1.5 Windows updater image has
+  the same defect (SHA-1 `cf6f9a95c0262137942b8842578e195fbae64e6b`, matching the
+  [vendor listing](https://nuphy.com.tw/pages/qmk-firmwares)). Keyboard firmware
+  can't fix it; it needs a corrected receiver image.
+- Host tests check the reports the keyboard emits, not radio delivery or the
+  receiver's retry/deduplication.
 
-| Metric / Feature | Upstream (v3.0.0 Base) | Optimized Latest (v3.2.1) | Impact & Improvement |
-| :--- | :--- | :--- | :--- |
-| **Startup Dead-Time** | `1250ms` (worst-case) | `~230ms` | **5.4× faster boot-up** & instant availability |
-| **Active Periodic UART Utilization** | `11.3%` | `0.9%` | **12.5× reduced wireless bus congestion** |
-| **Per-Report UART Payload Time** | `2.35ms` (brute 3× repeats) | `0.72ms` (reliable 1× transmit) | **3.26× faster keystroke packet dispatch** |
-| **Keystroke Transmission Latency** | `~4.0ms` | `~1ms` | **Ultra-low latency** key-press registration |
-| **Deep-Sleep First-Key Wakeup (current source)** | Keystroke lost + `75ms` delay | Buffered until selected-channel connection | Simulated ordered delivery; hardware validation pending |
-| **Mac Spotlight/Screenshot Lag** | `50ms` key-chord delay | `5ms` optimized chord delay | **Eliminated sluggish OS-shortcut latency** |
-| **USB Suspend Power Draw** | Exceeded limits (up to `20mA`) | Compliant **< 2.5mA** limit | **100% Standard USB Compliance** (stops battery drain) |
-| **UART Loop Transmit** | Blocked 5–10ms per wireless cmd | **Non-blocking (0ms)** concurrent polling | **Zero boot/wakeup locks**, flawless channel switching |
-| **Key Debounce (current source)** | `1ms` | `10ms` asym_eager_defer_pk | Filters tested contact chatter; no press delay, releases need 10ms stable |
-| **Binary Footprint** | `56,490` bytes | `56,862` bytes | **Feature-rich layout** optimized for performance and completeness |
+## License
 
-## ✨ Features
-
-- Bluetooth LE + 2.4 GHz wireless (NRF52832 module)
-- Wired USB HID (keyboard + consumer + system control)
-- 5-layer keymap (Mac/Win base + Fn layers)
-- Side LED animations (wave/mix/static/breath/off)
-- Dual IS31FL3733 RGB matrix (110 LEDs)
-- EEPROM config persistence
-- DFU bootloader entry (Escape key at boot)
-
-## 📜 License
-
-GPL-2.0-or-later — derived from QMK firmware and NuPhy's keyboard code.
-
-
-## Wireless receiver limitations
-
-Current source gives each key usage a fixed report interface to prevent held-key
-migration during rollover: usages 1..111 use the bitmap report; higher usages
-share six byte-report slots. More than six simultaneous higher usages cannot be
-represented by this protocol. Ordinary wireless typing now relies on the NKRO
-interface; BIOS/boot-only host compatibility is unverified. Use wired USB there.
-
-The connected receiver and the application image in NuPhy's official 2.1.5
-Windows updater both contain interface 1 with `bNumEndpoints=1` followed by two
-endpoint descriptors. Linux logs the mismatch. The updater's SHA-1 matches the
-[published vendor listing](https://nuphy.com.tw/pages/qmk-firmwares):
-`cf6f9a95c0262137942b8842578e195fbae64e6b`.
-Installing that package is not a demonstrated fix for this descriptor defect.
-Receiver source or a corrected vendor image is needed to repair it.
-
-Host regression tests validate emitted reports and modeled interface transitions,
-not radio delivery. Hardware acceptance still needs idle/wake taps, rapid taps,
-held-key rollover, disconnect/reconnect releases, and both receiver interfaces
-observed together. Retry/deduplication and buffer behavior inside the receiver
-remain unverified. The source changes do not update receiver firmware.
+GPL-2.0-or-later, derived from QMK and NuPhy's keyboard code.

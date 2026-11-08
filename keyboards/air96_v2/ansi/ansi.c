@@ -56,6 +56,7 @@ bool f_bat_num_show     = 0;
 uint8_t  numlock_phase        = 0;  /* 0=done, 1=armed, 2=holding press */
 uint32_t numlock_settle_start = 0;  /* set when USB first configured */
 uint32_t numlock_hold_start   = 0;  /* set when press registered */
+bool     f_numlock_rearm      = 0;  /* USB bus reset seen: host re-enumerating */
 
 uint8_t host_mode;
 host_driver_t *m_host_driver   = 0;
@@ -704,6 +705,71 @@ void keyboard_post_init_kb(void)
 }
 
 /**
+ * @brief  USB bus reset or deconfigure means the host is enumerating again
+ *         (PC restart or replug), so re-check NumLock. Ignored in wireless
+ *         mode, where the cable only charges.
+ */
+void notify_usb_device_state_change_kb(enum usb_device_state state)
+{
+    if (state == USB_DEVICE_STATE_INIT && dev_info.link_mode == LINK_USB) {
+        f_numlock_rearm = true;
+    }
+    notify_usb_device_state_change_user(state);
+}
+
+/**
+ * @brief  Turn host NumLock on each time the link to a host comes up:
+ *         keyboard power-on, USB re-enumeration (PC restart), wireless
+ *         (re)connect, or a mode/OS dial switch. Wait 2s for the host to
+ *         settle and report its LED state, then require a 200ms idle window
+ *         so the press can't land on top of the user's first keypresses.
+ *         Hold 50ms so slow hosts register it; skip if NumLock is already
+ *         on. Windows mode only: macOS has no NumLock (the key is Clear).
+ */
+static void numlock_task(void)
+{
+    static bool was_ready = false;
+    bool ready = dev_info.sys_sw_state == SYS_SW_WIN &&
+                 (dev_info.link_mode == LINK_USB
+                      ? host_mode == HOST_USB_TYPE && usb_device_state == USB_DEVICE_STATE_CONFIGURED
+                      : host_mode == HOST_RF_TYPE && dev_info.rf_state == RF_CONNECT && !f_wakeup_prepare && !f_goto_sleep);
+
+    /* Always finish a started press, even if the link dropped meanwhile. */
+    if (numlock_phase == 2) {
+        if (timer_elapsed32(numlock_hold_start) >= 50) {
+            unregister_code(KC_NUM_LOCK);
+            numlock_phase = 0;
+        }
+        return;
+    }
+
+    if (f_numlock_rearm || (ready && !was_ready)) {
+        f_numlock_rearm      = false;
+        numlock_phase        = 1;
+        numlock_settle_start = 0;
+    }
+    was_ready = ready;
+
+    if (!ready) {
+        numlock_settle_start = 0;
+        return;
+    }
+    if (numlock_phase == 1) {
+        if (numlock_settle_start == 0) {
+            numlock_settle_start = timer_read32();
+        } else if (timer_elapsed32(numlock_settle_start) >= 2000 && no_act_time > 20) {
+            if (!host_keyboard_led_state().num_lock) {
+                register_code(KC_NUM_LOCK);
+                numlock_phase      = 2;
+                numlock_hold_start = timer_read32();
+            } else {
+                numlock_phase = 0;
+            }
+        }
+    }
+}
+
+/**
    rgb_matrix_indicators_user
  */
 bool rgb_matrix_indicators_kb(void)
@@ -746,30 +812,5 @@ void housekeeping_task_kb(void)
         wait_ms(10);
     }
 
-    /* One-shot NumLock ON at boot. Wait 2s after USB enumeration for
-       the host to settle, then require a 200ms idle window so the press
-       can't land on top of the user's first keypresses (which was
-       flipping host NumLock state mid-typing on the numpad). Hold the
-       press for 50ms so even the slowest host reliably registers the
-       toggle, and skip entirely if the host already has NumLock on. */
-    if (dev_info.link_mode != LINK_USB || host_mode != HOST_USB_TYPE || usb_device_state != USB_DEVICE_STATE_CONFIGURED) {
-        numlock_settle_start = 0;
-        return;
-    }
-    if (numlock_phase == 1) {
-        if (numlock_settle_start == 0) {
-            numlock_settle_start = timer_read32();
-        } else if (timer_elapsed32(numlock_settle_start) >= 2000 && no_act_time > 20) {
-            if (!host_keyboard_led_state().num_lock) {
-                register_code(KC_NUM_LOCK);
-                numlock_phase      = 2;
-                numlock_hold_start = timer_read32();
-            } else {
-                numlock_phase = 0;
-            }
-        }
-    } else if (numlock_phase == 2 && timer_elapsed32(numlock_hold_start) >= 50) {
-        unregister_code(KC_NUM_LOCK);
-        numlock_phase = 0;
-    }
+    numlock_task();
 }

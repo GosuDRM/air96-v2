@@ -65,32 +65,49 @@ int main(void){
 '''])
 
     helper = ansi[ansi.index('static void tap_shortcut('):ansi.index('/**\n * @brief  qmk process record')]
-    numlock = ansi[ansi.index('    if (dev_info.link_mode != LINK_USB || host_mode != HOST_USB_TYPE'):]
-    numlock = numlock[:numlock.index('\n}')]
+    def function(signature):
+        body = ansi[ansi.index(signature):]
+        return body[:body.index('\n}\n') + 3]
+    numlock = function('void notify_usb_device_state_change_kb(') + function('static void numlock_task(void)')
     compile_run(tmp, 'input', [r'''
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #define LINK_USB 4
+#define LINK_BT_1 1
 #define HOST_USB_TYPE 0
-#define USB_DEVICE_STATE_CONFIGURED 1
+#define HOST_RF_TYPE 2
+#define RF_CONNECT 3
+#define RF_DISCONNECT 4
+#define SYS_SW_WIN 0xa1
+#define SYS_SW_MAC 0xa2
 #define KC_NUM_LOCK 83
+enum usb_device_state {USB_DEVICE_STATE_INIT=1,USB_DEVICE_STATE_CONFIGURED=2,USB_DEVICE_STATE_SUSPEND=3};
 uint8_t weak,real,keys[256],numlock_phase,host_mode;
-unsigned reports,now,numlock_settle_start,numlock_hold_start,no_act_time=100,usb_device_state=1;
-struct {unsigned link_mode;} dev_info;
+unsigned reports,now=1,presses,numlock_settle_start,numlock_hold_start,no_act_time=100,usb_device_state;
+bool f_numlock_rearm,f_wakeup_prepare,f_goto_sleep,host_num;
+struct {unsigned link_mode,rf_state,sys_sw_state;} dev_info;
 struct leds {bool num_lock;};
-struct leds host_keyboard_led_state(void){return (struct leds){false};}
+struct leds host_keyboard_led_state(void){return (struct leds){host_num};}
 uint8_t get_weak_mods(void){return weak;}
 bool is_key_pressed(uint8_t k){return keys[k];}
 void add_weak_mods(uint8_t m){weak|=m;}
 void set_weak_mods(uint8_t m){weak=m;}
 void send_keyboard_report(void){reports++;}
-void register_code(uint8_t k){keys[k]=1;}
+/* Host model: each NumLock press toggles the host's NumLock state. */
+void register_code(uint8_t k){keys[k]=1;if(k==KC_NUM_LOCK){presses++;host_num=!host_num;}}
 void unregister_code(uint8_t k){keys[k]=0;}
 void wait_ms(unsigned n){now+=n;}
 uint32_t timer_read32(void){return now;}
 uint32_t timer_elapsed32(uint32_t t){return now-t;}
-''' + helper + '\nvoid numlock_task(void){\n' + numlock + r'''
+void notify_usb_device_state_change_user(enum usb_device_state s){(void)s;}
+''' + helper + numlock + r'''
+static void run(unsigned ms){while(ms--){numlock_task();now++;}}
+/* PC restart, reset and configure events applied back to back: housekeeping
+   never observes the bus unconfigured, so only the reset event can re-arm. */
+static void usb_reenumerate(void){
+ usb_device_state=USB_DEVICE_STATE_INIT;notify_usb_device_state_change_kb(USB_DEVICE_STATE_INIT);
+ usb_device_state=USB_DEVICE_STATE_CONFIGURED;notify_usb_device_state_change_kb(USB_DEVICE_STATE_CONFIGURED);
 }
 int main(void){
  for(unsigned held=0;held<2;held++){
@@ -98,13 +115,40 @@ int main(void){
   tap_shortcut(0x0a,4);
   assert(real==0x0a && weak==0x40 && keys[4]==held && reports);
  }
- for(unsigned mode=0;mode<4;mode++){
-  dev_info.link_mode=mode;host_mode=2;numlock_phase=1;numlock_settle_start=1;now=3000;
-  numlock_task();assert(!keys[KC_NUM_LOCK] && numlock_phase==1 && !numlock_settle_start);
- }
- dev_info.link_mode=LINK_USB;host_mode=HOST_USB_TYPE;
- numlock_task();now+=2000;numlock_task();assert(keys[KC_NUM_LOCK] && numlock_phase==2);
- now+=50;numlock_task();assert(!keys[KC_NUM_LOCK] && !numlock_phase);
+ /* Keyboard power-on, wired: NumLock turned on once the host has settled. */
+ dev_info.sys_sw_state=SYS_SW_WIN;dev_info.link_mode=LINK_USB;host_mode=HOST_USB_TYPE;
+ usb_device_state=USB_DEVICE_STATE_CONFIGURED;numlock_phase=1;
+ run(1999);assert(!presses);
+ run(10);assert(presses==1 && keys[KC_NUM_LOCK]);
+ run(60);assert(!keys[KC_NUM_LOCK] && host_num && !numlock_phase);
+ /* A user who turns NumLock off is not overridden while the link stays up. */
+ host_num=false;run(10000);assert(presses==1);
+ /* PC restart (bus reset + re-enumeration) comes back with NumLock off: turn it on. */
+ usb_reenumerate();run(2200);assert(presses==2 && host_num && !keys[KC_NUM_LOCK]);
+ /* Host already restores NumLock on: never toggle it back off. */
+ usb_reenumerate();run(3000);assert(presses==2 && host_num);
+ /* Wait for an idle window so the press can't interleave with typing. */
+ host_num=false;usb_reenumerate();no_act_time=0;run(5000);assert(presses==2);
+ no_act_time=100;run(100);assert(presses==3 && host_num);
+ run(60);
+ /* Wireless: charging cable resets don't target the radio host; connect does. */
+ dev_info.link_mode=LINK_BT_1;host_mode=HOST_RF_TYPE;dev_info.rf_state=RF_DISCONNECT;host_num=false;
+ usb_reenumerate();assert(!f_numlock_rearm);run(5000);assert(presses==3);
+ dev_info.rf_state=RF_CONNECT;run(2200);assert(presses==4 && host_num);
+ /* Reconnect (e.g. PC restart over Bluetooth) re-applies NumLock on. */
+ host_num=false;dev_info.rf_state=RF_DISCONNECT;run(500);dev_info.rf_state=RF_CONNECT;run(2200);
+ assert(presses==5 && host_num);
+ /* Nothing is sent while the radio sleeps; the wake reconnect re-applies it. */
+ host_num=false;f_goto_sleep=true;run(5000);assert(presses==5);
+ f_goto_sleep=false;run(2200);assert(presses==6 && host_num);
+ /* Link drop mid-press still releases the key (no stuck NumLock). */
+ host_num=false;dev_info.rf_state=RF_DISCONNECT;run(10);dev_info.rf_state=RF_CONNECT;
+ while(!keys[KC_NUM_LOCK])run(1);
+ dev_info.rf_state=RF_DISCONNECT;run(60);assert(!keys[KC_NUM_LOCK] && !numlock_phase);
+ /* Mac mode: macOS has no NumLock (the key acts as Clear), so never press it. */
+ unsigned before=presses;host_num=false;dev_info.sys_sw_state=SYS_SW_MAC;
+ dev_info.rf_state=RF_CONNECT;run(5000);
+ dev_info.link_mode=LINK_USB;host_mode=HOST_USB_TYPE;usb_reenumerate();run(5000);assert(presses==before);
 }
 '''])
     flush = led[led.index('bool is31fl3733_flush_continue(void) {'):]
@@ -145,4 +189,4 @@ int main(void){
 
 }
 '''])
-print('Runtime regressions passed: buffer boundaries (ASan), held shortcut state, USB NumLock ownership, mid-flush RGB changes')
+print('Runtime regressions passed: buffer boundaries (ASan), held shortcut state, NumLock on at boot, PC restart and wireless reconnect, mid-flush RGB changes')

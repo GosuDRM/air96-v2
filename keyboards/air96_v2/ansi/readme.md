@@ -1,61 +1,26 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/keyboard-NuPhy%20Air96%20V2-brightgreen.svg?style=for-the-badge" alt="Keyboard"/>
-  <img src="https://img.shields.io/badge/mcu-STM32F072-orange.svg?style=for-the-badge" alt="MCU"/>
-  <img src="https://img.shields.io/badge/status-stable-brightgreen.svg?style=for-the-badge" alt="Status"/>
-</p>
+# Air96 V2 (ANSI)
 
-# ⌨️ Air96 V2 Keyboard Port
+NuPhy Air96 V2, a 96% wireless keyboard (USB, Bluetooth LE, 2.4 GHz).
 
-Optimized high-performance QMK firmware port for the Air96 V2 wireless mechanical keyboard.
+* Hardware: STM32F072, NRF52832 radio module (UART, 460800 baud),
+  2× IS31FL3733 (110 RGB LEDs)
+* Keymaps: `default`, `via`
 
-## 🚀 What's Changed
+Make example for this keyboard (after setting up your build environment):
 
-This firmware has been extensively audited, bug-fixed, and performance-hardened compared to the stock version:
+    qmk compile -kb air96_v2/ansi -km default
 
-- **⚡ Zero-Latency Wake & Command Hardening** — Solved a critical wait-for-ACK loop blocking issue in `rf.c`, restoring immediate, non-blocking serial parsing. Wireless startup dead-time has been slashed **5.4×** (1250ms → 230ms), and inline wakeup logic ensures that the first keystroke after deep sleep is preserved and registered within `2.7ms` (previously lost + 75ms).
-- **🔋 Power Consumption & USB Compliance** — Prescaled state synchronization checks in wired mode to save 2-3mA on battery. The sleep handler has been hardened to force LED and NRF power-downs during USB suspend even when auto-sleep is disabled, fully satisfying the USB suspend current draw limits (0.5mA / 2.5mA max).
-- **🧠 Layout & UX Refinements** — Added deferred NumLock auto-on signaling synchronized with USB enumeration to match high-end custom firmware. Reduced Spotlight and screenshot key chord blocks from 50ms to 5ms for rapid, lag-free OS registration.
-- **🔄 Stability Overhaul (v3.2.0)** — Multi-pass audit fixing sleep/wake lockup, mode-switching state leaks, LED flicker, and UART protocol edge cases. NRF sleep requests are now rejected when USB is active, all sync counters reset on mode switch, battery indicator auto-dismisses after 10s, and key debounce raised from 1ms to 5ms to eliminate double keypresses. Full list in [CHANGELOG.md](../../../CHANGELOG.md).
-- **🧹 Code Quality & Footprint Optimization** — Eliminated all brace omissions, implicit boolean conversions, and scoped local variables to their narrowest blocks. Transitioned the battery LED indicator to a dynamic loop with lookup arrays, optimizing compiler generation and **limiting the final binary footprint to 56,862 bytes** (including all custom features).
-- **📜 Full Revision History** — See [CHANGELOG.md](../../../CHANGELOG.md) for the complete record of all optimizations, bug fixes, and releases.
+Flashing example for this keyboard:
 
-## 🛠️ Build
+    make air96_v2/ansi:default:flash
 
-Requires QMK CLI and `arm-none-eabi-gcc` toolchain.
+See the [build environment setup](https://docs.qmk.fm/newbs_getting_started)
+and the [make instructions](https://docs.qmk.fm/getting_started_make_guide).
 
-```bash
-qmk compile -kb air96_v2/ansi -km default
-```
+## Bootloader
 
-Or build with standard GNU Make:
+Hold **Esc** while plugging in the USB cable (bootmagic). This also clears
+saved settings.
 
-```bash
-make air96_v2/ansi:default
-```
-
-## ⚡ Flash
-
-📥 **[Release Firmware (air96-v2-c-v3.2.8.bin)](https://github.com/GosuDRM/air96-v2/releases/download/v3.2.8/air96-v2-c-v3.2.8.bin)**
-
-1. Disconnect the keyboard's USB cable.
-2. Hold down the **Escape** key while plugging in the USB cable to enter DFU bootloader mode.
-3. Execute the flash command:
-```bash
-make air96_v2/ansi:default:flash
-```
-
-## 🎛️ VIA Support
-
-To compile the firmware with VIA layout editing support, use the `via` keymap:
-
-```bash
-make air96_v2/ansi:via
-```
-
-## 🏷️ Version Specs
-
-- **Version:** `v3.2.8`
-- **Controller:** STM32F072
-- **RGB Matrix Driver:** Dual IS31FL3733 (110 individual RGB LEDs)
-- **Wireless Interface:** 460800 baud hardware UART interface to NRF52832 module
-
+Changes from NuPhy's firmware are listed in the repository
+[README](../../../README.md) and [CHANGELOG](../../../CHANGELOG.md).

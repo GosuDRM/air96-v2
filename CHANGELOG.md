@@ -2,6 +2,16 @@
 
 All notable changes to the optimized Air96 V2 custom firmware fork.
 
+## v3.2.9 (2026-11-07)
+*NumLock on by default after power-on, PC restart and wireless reconnect.*
+
+- Turn host NumLock on each time a host link comes up: keyboard power-on, USB re-enumeration (PC restart or replug), Bluetooth/2.4 GHz (re)connect including wake from idle sleep, and mode or OS dial switches. Previously this ran once at power-on and only over USB.
+- Keep the existing safeguards: wait 2s for the host to settle, require a 200ms idle window, hold the press 50ms, and skip if NumLock is already on. A user who turns NumLock off is not overridden until the next reconnect or restart.
+- Re-arm on the USB bus reset event, so a re-enumeration is caught even when housekeeping never sees the bus unconfigured (e.g. during a blocking wait). Ignore USB resets in wireless mode, where the cable only charges.
+- Always release a started NumLock press, even if the link drops during the hold.
+- Skip in Mac mode: macOS has no NumLock and the key acts as Clear. This also removes the previous wired power-on press in Mac mode.
+- Add regressions for power-on, PC restart, NumLock already on, typing during settle, wireless reconnect, sleep/wake, link drop mid-press and Mac mode. Wireless relies on the radio reporting host LED state; a 2.4 GHz warm restart that keeps the dongle powered and linked is not detected. Hardware behavior unverified.
+
 ## v3.2.8 (2026-11-07)
 *Immediate debounced presses, wireless wake and link-loss fixes, idle core during sleep.*
 
